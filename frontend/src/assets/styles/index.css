@@ -1,0 +1,150 @@
+.footer {
+  background-color: #f8f9fa;
+}
+
+.footer-link {
+  text-decoration: none;
+  color: #6c757d;
+  font-size: 0.9rem;
+  transition: 0.2s;
+}
+
+.footer-link:hover {
+  color: #0d6efd;
+  transform: translateY(-1px);
+}
+
+[data-bs-theme="dark"] .footer {
+  background-color: #212529;
+}
+
+[data-bs-theme="dark"] .footer-link {
+  color: #adb5bd;
+}
+
+.event-card {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: #fff;
+  transition: 0.25s ease;
+}
+
+.event-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.event-img-wrapper {
+  height: 250px;
+  overflow: hidden;
+}
+
+.event-img {
+  height: 250px;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.event-card:hover .event-img {
+  transform: scale(1.05);
+}
+
+.event-title {
+  color: #111;
+}
+
+.event-location {
+  color: #666;
+}
+
+.event-card {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: #fff;
+  transition: 0.25s ease;
+}
+
+.event-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.event-img-wrapper {
+  height: 250px;
+  overflow: hidden;
+}
+
+.event-img {
+  height: 250px;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.event-card:hover .event-img {
+  transform: scale(1.05);
+}
+
+.event-title {
+  color: #111;
+}
+
+.event-location {
+  color: #666;
+}
+
+[data-bs-theme="dark"] .event-card {
+  background-color: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-bs-theme="dark"] .event-title {
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .event-location {
+  color: #bbb;
+}
+
+.event-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.event-img-wrapper {
+  height: 250px;
+  overflow: hidden;
+}
+
+.event-img {
+  height: 250px;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.event-card:hover .event-img {
+  transform: scale(1.05);
+}
+
+.event-title {
+  color: #111;
+}
+
+.event-location {
+  color: #666;
+}
+
+[data-bs-theme="dark"] .event-card {
+  background-color: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-bs-theme="dark"] .event-title {
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .event-location {
+  color: #bbb;
+}
+
+[data-bs-theme="dark"] {
+  --bs-body-color: #ffffff;
+  --bs-border-color: #ffffff;
+}

@@ -1,3 +1,15 @@
+body {
+  color: black;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+/* NASLOVI */
+h1, h2, h3, h4, .fw-bold {
+  font-family: 'Fjalla One', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+/* FOOTER */
 .footer {
   background-color: #f8f9fa;
 }
@@ -14,18 +26,12 @@
   transform: translateY(-1px);
 }
 
-[data-bs-theme="dark"] .footer {
-  background-color: #212529;
-}
-
-[data-bs-theme="dark"] .footer-link {
-  color: #adb5bd;
-}
-
+/* EVENT CARD */
 .event-card {
   border: 1px solid rgba(0, 0, 0, 0.12);
   background-color: #fff;
   transition: 0.25s ease;
+  overflow: hidden;
 }
 
 .event-card:hover {
@@ -33,13 +39,15 @@
   box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
 }
 
+/* IMAGE */
 .event-img-wrapper {
   height: 250px;
   overflow: hidden;
 }
 
 .event-img {
-  height: 250px;
+  height: 100%;
+  width: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
@@ -48,6 +56,7 @@
   transform: scale(1.05);
 }
 
+/* TEXT */
 .event-title {
   color: #111;
 }
@@ -56,95 +65,26 @@
   color: #666;
 }
 
-.event-card {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background-color: #fff;
-  transition: 0.25s ease;
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.event-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+main {
+  flex: 1;
 }
 
-.event-img-wrapper {
-  height: 250px;
-  overflow: hidden;
+html, body {
+  height: 100%;
 }
 
-.event-img {
-  height: 250px;
-  object-fit: cover;
-  transition: transform 0.3s ease;
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.event-card:hover .event-img {
-  transform: scale(1.05);
-}
-
-.event-title {
-  color: #111;
-}
-
-.event-location {
-  color: #666;
-}
-
-[data-bs-theme="dark"] .event-card {
-  background-color: #1e1e1e;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-[data-bs-theme="dark"] .event-title {
-  color: #fff;
-}
-
-[data-bs-theme="dark"] .event-location {
-  color: #bbb;
-}
-
-.event-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
-}
-
-.event-img-wrapper {
-  height: 250px;
-  overflow: hidden;
-}
-
-.event-img {
-  height: 250px;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.event-card:hover .event-img {
-  transform: scale(1.05);
-}
-
-.event-title {
-  color: #111;
-}
-
-.event-location {
-  color: #666;
-}
-
-[data-bs-theme="dark"] .event-card {
-  background-color: #1e1e1e;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-[data-bs-theme="dark"] .event-title {
-  color: #fff;
-}
-
-[data-bs-theme="dark"] .event-location {
-  color: #bbb;
-}
-
-[data-bs-theme="dark"] {
-  --bs-body-color: #ffffff;
-  --bs-border-color: #ffffff;
+main {
+  flex: 1;
 }

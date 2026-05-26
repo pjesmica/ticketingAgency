@@ -1,1 +1,25 @@
 @import url("https://cdn.jsdelivr.net/npm/bootswatch@5.3.8/dist/brite/bootstrap.min.css");
+
+.btn-primary {
+  background-color: #ff940a !important;
+  border-color: #ff940a !important;
+  color: #000 !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: #ffab3d !important;
+  border-color: #ffab3d !important;
+  color: #000 !important;
+}
+
+.btn-outline-primary {
+  border-color: #ff940a !important;
+  color: #ff940a !important;
+}
+
+.btn-outline-primary:hover {
+  background-color: #ff940a !important;
+  color: #000 !important;
+}

@@ -14,31 +14,84 @@ const eventSchema = new mongoose.Schema(
             required: true,
             ref: 'User',
         },
-        name: { type: String, required: true },
+
+        name: {
+            type: String,
+            required: true,
+        },
+
         image: {
             type: String,
             required: true,
             default: '/images/placeholder.jpg',
         },
-        description: { type: String, required: true },
+
+        description: {
+            type: String,
+            required: true,
+        },
+
         category: {
             type: String,
             required: true,
-            enum: ['Koncerti', 'Festivali', 'Sport', 'Pozorište', 'Komedija', 'Ostalo'],
+            enum: [
+                'Koncerti',
+                'Festivali',
+                'Sport',
+                'Pozorište',
+                'Komedija',
+                'Ostalo',
+            ],
             default: 'Ostalo',
         },
-        venue: {
-            name: { type: String, required: true },
-            city: { type: String, required: true },
-            address: { type: String },
-        },
-        date: { type: Date, required: true },
-        time: { type: String, required: true },
-        ticketTypes: [ticketTypeSchema],
-        isActive: { type: Boolean, default: true },
 
-        // Da li ovaj događaj koristi mapu sedišta
-        hasSeatMap: { type: Boolean, default: false },
+        venue: {
+            name: {
+                type: String,
+                required: true,
+            },
+
+            city: {
+                type: String,
+                required: true,
+            },
+
+            country: {
+                type: String,
+            },
+
+            address: {
+                type: String,
+            },
+        },
+
+        startDate: {
+            type: Date,
+            required: true,
+        },
+
+        endDate: {
+            type: Date,
+            required: true,
+        },
+
+        time: {
+            type: String,
+            required: true,
+        },
+
+        ticketTypes: [ticketTypeSchema],
+
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+
+        // Da li događaj koristi mapu sedišta
+        hasSeatMap: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

@@ -10,6 +10,9 @@ const normalizeText = (text) =>
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/\s/g, '');
 
+// helper za boolean (FIX za hasSeatMap bug)
+const toBoolean = (value) => value === true || value === 'true';
+
 // @desc    Dobavi sve aktivne događaje
 // @route   GET /api/events
 // @access  Public
@@ -18,18 +21,20 @@ const getEvents = asyncHandler(async (req, res) => {
     const category = req.query.category || '';
     const date = req.query.date || '';
 
-    const events = await Event.find({ isActive: true }).sort({ date: 1 });
+    const events = await Event.find({ isActive: true }).sort({ startDate: 1 });
 
     const normalizedKeyword = normalizeText(keyword);
-    const normalizedDate = date ? new Date(date).toISOString().split('T')[0] : null;
+    const normalizedDate = date
+        ? new Date(date).toISOString().split('T')[0]
+        : null;
 
     const filtered = events.filter((event) => {
         const haystack = normalizeText(
             `${event.name} ${event.category} ${event.venue?.city} ${event.venue?.name}`
         );
 
-        const eventDate = event.date
-            ? new Date(event.date).toISOString().split('T')[0]
+        const eventDate = event.startDate
+            ? new Date(event.startDate).toISOString().split('T')[0]
             : null;
 
         const matchKeyword = normalizedKeyword
@@ -82,9 +87,17 @@ const createEvent = asyncHandler(async (req, res) => {
         image: req.body.image || '/images/placeholder.jpg',
         description: req.body.description || 'Opis događaja',
         category: req.body.category || 'Ostalo',
-        venue: req.body.venue || { name: 'Venue', city: 'Grad', address: '' },
-        date: req.body.date || new Date(),
+        venue: req.body.venue || {
+            name: 'Venue',
+            city: 'Grad',
+            address: '',
+        },
+
+        startDate: req.body.startDate || new Date(),
+        endDate: req.body.endDate || new Date(),
+
         time: req.body.time || '20:00',
+
         ticketTypes: req.body.ticketTypes || [
             {
                 name: 'Regular',
@@ -93,7 +106,13 @@ const createEvent = asyncHandler(async (req, res) => {
                 availableQuantity: 100,
             },
         ],
-        isActive: req.body.isActive !== undefined ? req.body.isActive : false,
+
+        isActive:
+            req.body.isActive !== undefined
+                ? req.body.isActive
+                : false,
+
+        hasSeatMap: toBoolean(req.body.hasSeatMap),
     });
 
     const createdEvent = await event.save();
@@ -112,13 +131,19 @@ const updateEvent = asyncHandler(async (req, res) => {
         event.description = req.body.description || event.description;
         event.category = req.body.category || event.category;
         event.venue = req.body.venue || event.venue;
-        event.date = req.body.date || event.date;
+
+        event.startDate = req.body.startDate || event.startDate;
+        event.endDate = req.body.endDate || event.endDate;
+
         event.time = req.body.time || event.time;
         event.ticketTypes = req.body.ticketTypes || event.ticketTypes;
+
         event.isActive =
             req.body.isActive !== undefined
                 ? req.body.isActive
                 : event.isActive;
+
+        event.hasSeatMap = toBoolean(req.body.hasSeatMap);
 
         const updatedEvent = await event.save();
         res.status(200).json(updatedEvent);

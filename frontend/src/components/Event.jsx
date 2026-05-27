@@ -3,7 +3,7 @@ import { Card, Badge } from 'react-bootstrap';
 import { FaMapMarkerAlt, FaCalendarAlt, FaClock } from 'react-icons/fa';
 
 const Event = ({ event }) => {
-    console.log("EVENT:", event);
+    console.log('EVENT:', event);
 
     if (!event) return null;
 
@@ -12,13 +12,28 @@ const Event = ({ event }) => {
             ? Math.min(...event.ticketTypes.map((t) => t.price))
             : null;
 
-    const date = event.date ? new Date(event.date) : null;
+    // START / END DATE
+    const startDate = event.startDate
+        ? new Date(event.startDate)
+        : null;
 
-const formattedDate = date
-    ? `${date.getDate()}. ${date.toLocaleString('sr-Latn-RS', {
-          month: 'long',
-      })} ${date.getFullYear()}`
-    : '';
+    const endDate = event.endDate
+        ? new Date(event.endDate)
+        : null;
+
+    // FORMAT DATE
+    const formatDate = (date) =>
+        `${date.getDate()}. ${date.toLocaleString('sr-Latn-RS', {
+            month: 'long',
+        })} ${date.getFullYear()}`;
+
+    // DATE DISPLAY
+    const formattedDate = startDate
+        ? endDate &&
+          startDate.getTime() !== endDate.getTime()
+            ? `${formatDate(startDate)} - ${formatDate(endDate)}`
+            : formatDate(startDate)
+        : '';
 
     const eventId = event?._id;
 
@@ -79,7 +94,11 @@ const formattedDate = date
                         <div className="d-flex align-items-center gap-2">
                             <FaMapMarkerAlt />
                             {event.venue?.name
-                                ? `${event.venue.name}, ${event.venue.city}`
+                                ? `${event.venue.name}, ${event.venue.city}${
+                                      event.venue.country
+                                          ? `, ${event.venue.country}`
+                                          : ''
+                                  }`
                                 : event.location || ''}
                         </div>
 

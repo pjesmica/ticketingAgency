@@ -15,10 +15,7 @@ const eventSchema = new mongoose.Schema(
             ref: 'User',
         },
 
-        name: {
-            type: String,
-            required: true,
-        },
+        name: { type: String, required: true },
 
         image: {
             type: String,
@@ -26,10 +23,9 @@ const eventSchema = new mongoose.Schema(
             default: '/images/placeholder.jpg',
         },
 
-        description: {
-            type: String,
-            required: true,
-        },
+        ticketImage: { type: String, default: '' },
+
+        description: { type: String, required: true },
 
         category: {
             type: String,
@@ -46,25 +42,13 @@ const eventSchema = new mongoose.Schema(
         },
 
         venue: {
-            name: {
-                type: String,
-                required: true,
-            },
-
-            city: {
-                type: String,
-                required: true,
-            },
-
-            country: {
-                type: String,
-            },
-
-            address: {
-                type: String,
-            },
+            name: { type: String, required: true },
+            city: { type: String, required: true },
+            country: String,
+            address: String,
         },
 
+        // 🔥 SAMO JEDAN DATETIME
         startDate: {
             type: Date,
             required: true,
@@ -75,11 +59,6 @@ const eventSchema = new mongoose.Schema(
             required: true,
         },
 
-        time: {
-            type: String,
-            required: true,
-        },
-
         ticketTypes: [ticketTypeSchema],
 
         isActive: {
@@ -87,7 +66,6 @@ const eventSchema = new mongoose.Schema(
             default: true,
         },
 
-        // Da li događaj koristi mapu sedišta
         hasSeatMap: {
             type: Boolean,
             default: false,
@@ -97,5 +75,4 @@ const eventSchema = new mongoose.Schema(
 );
 
 const Event = mongoose.model('Event', eventSchema);
-
 export default Event;

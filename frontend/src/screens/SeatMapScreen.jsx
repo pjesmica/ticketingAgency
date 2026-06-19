@@ -1,362 +1,534 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Badge, Card, Spinner, Row, Col } from 'react-bootstrap';
 import { useDispatch, useSelector } from 'react-redux';
+import { Button, Badge, Spinner, Alert } from 'react-bootstrap';
+import { FaArrowLeft, FaShoppingCart, FaChair, FaRunning } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import { FaArrowLeft, FaTicketAlt } from 'react-icons/fa';
-import { useGetSeatsForEventQuery } from '../slices/seatsApiSlice';
 import { useGetEventDetailsQuery } from '../slices/eventsApiSlice';
+import { useGetVenueSectionsQuery } from '../slices/venueSectionApiSlice';
+import { useGetSeatsForEventQuery } from '../slices/seatsApiSlice';
 import { addToCart } from '../slices/cartSlice';
-import Loader from '../components/Loader';
-import Message from '../components/Message';
 
-// Boje sektora
-const SECTOR_COLORS = {
-    Parter:  { free: '#4ade80', hover: '#16a34a', reserved: '#e5e7eb', selected: '#f97316' },
-    VIP:     { free: '#facc15', hover: '#ca8a04', reserved: '#e5e7eb', selected: '#f97316' },
-    Balkon:  { free: '#60a5fa', hover: '#2563eb', reserved: '#e5e7eb', selected: '#f97316' },
-};
+const sectionCapacity = s =>
+    s.sectorType === 'standing' ? (s.capacity || 0) : (s.rowCount || 0) * (s.seatsPerRow || 0);
 
-const SEAT_SIZE = 22;
-const SEAT_GAP = 4;
+export default function SeatMapScreen() {
+    const { id: eventId } = useParams();
+    const navigate        = useNavigate();
+    const dispatch        = useDispatch();
+    const { userInfo }    = useSelector(s => s.auth);
 
-const SeatMapScreen = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
-    const { userInfo } = useSelector((state) => state.auth);
+    const { data: event,  isLoading: loadingEvent  } = useGetEventDetailsQuery(eventId);
+    const { data: layout, isLoading: loadingLayout } = useGetVenueSectionsQuery(eventId);
+    const { data: seats,  isLoading: loadingSeats  } = useGetSeatsForEventQuery(eventId);
 
-    const { data: seats, isLoading: loadingSeats, error: errorSeats } = useGetSeatsForEventQuery(id);
-    const { data: event, isLoading: loadingEvent } = useGetEventDetailsQuery(id);
+    const [focusedSectionId, setFocusedSectionId] = useState(null);
+    const [selectedSeatIds,  setSelectedSeatIds]  = useState(new Set());
+    const [gaQuantities,     setGaQuantities]     = useState({});
 
-    const [selected, setSelected] = useState(new Set()); // Set of seat _id strings
-
-    // Grupiši sedišta po sektoru pa redu
-    const grouped = useMemo(() => {
+    const seatsBySection = useMemo(() => {
         if (!seats) return {};
         return seats.reduce((acc, seat) => {
-            if (!acc[seat.sector]) acc[seat.sector] = {};
-            if (!acc[seat.sector][seat.row]) acc[seat.sector][seat.row] = [];
-            acc[seat.sector][seat.row].push(seat);
+            const key = seat.section?.toString() || 'nosection';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(seat);
             return acc;
         }, {});
     }, [seats]);
 
-    const toggleSeat = (seat) => {
+    const sections    = layout?.sections    || [];
+    const decorations = layout?.decorations || [];
+    const focusedSection = sections.find(s => (s._id || s._localId) === focusedSectionId);
+
+    const toggleSeat = seat => {
         if (seat.isReserved) return;
-        setSelected((prev) => {
+        setSelectedSeatIds(prev => {
             const next = new Set(prev);
-            if (next.has(seat._id)) {
-                next.delete(seat._id);
-            } else {
-                next.add(seat._id);
-            }
+            if (next.has(seat._id)) next.delete(seat._id);
+            else next.add(seat._id);
             return next;
         });
     };
 
-    const selectedSeats = seats ? seats.filter((s) => selected.has(s._id)) : [];
+    const setGaQty = (section, qty) => {
+        const id   = section._id || section._localId;
+        const pool = (seatsBySection[id] || []).filter(s => !s.isReserved);
+        const safeQty = Math.max(0, Math.min(qty, pool.length));
+        const tt = event?.ticketTypes?.find(t => t._id?.toString() === section.ticketTypeId);
+        if (tt && safeQty > tt.availableQuantity) {
+            toast.warning(`Dostupno je samo ${tt.availableQuantity} kart(a) za "${tt.name}"`);
+            return;
+        }
+        setGaQuantities(prev => ({ ...prev, [id]: safeQty }));
+    };
 
-    // Grupiši selektovana sedišta po ticketType za korpu
-    const selectedByType = useMemo(() => {
-        return selectedSeats.reduce((acc, seat) => {
-            const key = seat.ticketType.toString();
-            if (!acc[key]) {
-                acc[key] = {
-                    ticketTypeId: seat.ticketType,
-                    ticketTypeName: seat.ticketTypeName,
-                    price: seat.price,
-                    seats: [],
-                };
+    const selectedSeats = useMemo(() =>
+        seats ? seats.filter(s => selectedSeatIds.has(s._id)) : [],
+    [seats, selectedSeatIds]);
+
+    const cartItems = useMemo(() => {
+        const items = [];
+        sections.filter(s => s.sectorType === 'standing').forEach(sec => {
+            const id  = sec._id || sec._localId;
+            const qty = gaQuantities[id] || 0;
+            if (qty > 0) {
+                const pool = (seatsBySection[id] || []).filter(s => !s.isReserved);
+                items.push({
+                    sectionName: sec.name, sectorType: 'standing',
+                    qty, price: sec.price,
+                    ticketTypeName: sec.ticketTypeName, ticketTypeId: sec.ticketTypeId,
+                    seats: pool.slice(0, qty),
+                });
             }
-            acc[key].seats.push(seat);
-            return acc;
-        }, {});
-    }, [selectedSeats]);
+        });
+        if (selectedSeats.length > 0) {
+            const grouped = selectedSeats.reduce((acc, seat) => {
+                const key = seat.ticketType?.toString() || 'default';
+                if (!acc[key]) acc[key] = { seats: [], ticketTypeName: seat.ticketTypeName, ticketTypeId: seat.ticketType, price: seat.price };
+                acc[key].seats.push(seat);
+                return acc;
+            }, {});
+            Object.values(grouped).forEach(g => {
+                items.push({
+                    sectorType: 'seated', qty: g.seats.length,
+                    price: g.price, ticketTypeName: g.ticketTypeName,
+                    ticketTypeId: g.ticketTypeId?.toString(), seats: g.seats,
+                });
+            });
+        }
+        return items;
+    }, [selectedSeats, gaQuantities, sections, seatsBySection]);
 
-    const totalPrice = selectedSeats.reduce((a, s) => a + s.price, 0);
+    const totalItems = cartItems.reduce((s, i) => s + i.qty, 0);
+    const totalPrice = cartItems.reduce((s, i) => s + i.qty * i.price, 0);
 
     const handleAddToCart = () => {
-        if (!userInfo) {
-            toast.info('Morate biti prijavljeni');
-            navigate(`/login?redirect=/events/${id}/seats`);
-            return;
-        }
-        if (selected.size === 0) {
-            toast.warning('Izaberite bar jedno sedište');
-            return;
-        }
-
-        Object.values(selectedByType).forEach(({ ticketTypeId, ticketTypeName, price, seats: typeSeats }) => {
+        if (!userInfo) { navigate('/login'); return; }
+        if (!totalItems) { toast.warning('Izaberite sedišta ili karte'); return; }
+        cartItems.forEach(item => {
             dispatch(addToCart({
-                eventId: event._id,
-                eventName: event.name,
-                eventDate: event.date,
-                eventVenue: event.venue ? `${event.venue.name}, ${event.venue.city}` : '',
-                eventImage: event.image,
-                ticketTypeId,
-                ticketType: ticketTypeName,
-                price,
-                quantity: typeSeats.length,
-                seats: typeSeats.map((s) => ({
-                    seatId: s._id,
-                    row: s.row,
-                    seatNumber: s.seatNumber,
-                    sector: s.sector,
+                eventId, eventName: event.name,
+                eventDate: event.startDate, eventVenue: event.venue?.name,
+                ticketType: item.ticketTypeName, ticketTypeId: item.ticketTypeId,
+                price: item.price, quantity: item.qty,
+                seats: item.seats.map(s => ({
+                    seatId: s._id, row: s.row, seatNumber: s.seatNumber, sector: s.sector,
                 })),
             }));
         });
-
-        toast.success(`${selected.size} sedišt${selected.size === 1 ? 'e dodato' : 'a dodato'} u korpu!`);
+        toast.success(`${totalItems} kart(e) dodato u korpu`);
         navigate('/cart');
     };
 
-    if (loadingSeats || loadingEvent) return <Loader />;
-    if (errorSeats) return <Message variant="danger">{errorSeats?.data?.message || 'Greška pri učitavanju sedišta'}</Message>;
+    if (loadingEvent || loadingLayout || loadingSeats)
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+                <Spinner animation="border" variant="success" />
+            </div>
+        );
 
-    const sectorOrder = ['VIP', 'Parter', 'Balkon'];
+    if (!sections.length)
+        return (
+            <div className="py-5">
+                <Alert variant="info">Mapa sale još nije konfigurisana za ovaj događaj.</Alert>
+                <Button variant="outline-secondary" onClick={() => navigate(-1)}>
+                    <FaArrowLeft className="me-2" />Nazad
+                </Button>
+            </div>
+        );
 
     return (
-        <div className="py-3">
-            <Button variant="outline-secondary" className="mb-3" onClick={() => navigate(-1)}>
-                <FaArrowLeft className="me-2" /> Nazad
-            </Button>
+        <div style={{ minHeight: '100vh', background: '#f0f4f8' }}>
+            {/* Header */}
+            <div style={{ background: '#1e293b', color: '#fff', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Button variant="outline-light" size="sm"
+                    onClick={() => focusedSectionId ? setFocusedSectionId(null) : navigate(-1)}>
+                    <FaArrowLeft />
+                </Button>
+                <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{event?.name}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {focusedSectionId
+                            ? `← Nazad na mapu · ${focusedSection?.name}`
+                            : `${event?.venue?.name || ''} · ${new Date(event?.startDate).toLocaleDateString('sr-RS')}`}
+                    </div>
+                </div>
+                <div style={{ flex: 1 }} />
+                {totalItems > 0 && (
+                    <div style={{ fontSize: 13, color: '#34d399', fontWeight: 700 }}>
+                        {totalItems} izabrano · {totalPrice.toLocaleString()} RSD
+                    </div>
+                )}
+            </div>
 
-            <h4 className="mb-1">{event?.name}</h4>
-            <p className="text-muted small mb-4">
-                Kliknite na sedište da ga izaberete. Narandžasto = izabrano.
-            </p>
-
-            <Row className="g-4">
-                {/* MAPA DVORANE */}
-                <Col lg={9}>
-
-                    {/* POZORNICA */}
-                    <div className="text-center mb-4">
-                        <div
-                            style={{
-                                background: 'linear-gradient(135deg, #1e293b, #334155)',
-                                color: '#fff',
-                                borderRadius: '12px 12px 0 0',
-                                padding: '10px 40px',
-                                display: 'inline-block',
-                                fontSize: '0.9rem',
-                                letterSpacing: '4px',
-                                fontWeight: 700,
-                                minWidth: '260px',
+            <div style={{ display: 'flex', height: 'calc(100vh - 60px)' }}>
+                {/* Map */}
+                <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+                    {!focusedSectionId ? (
+                        <VenueOverviewMap
+                            sections={sections}
+                            decorations={decorations}
+                            seatsBySection={seatsBySection}
+                            selectedSeatIds={selectedSeatIds}
+                            gaQuantities={gaQuantities}
+                            onSectionClick={sec => {
+                                if (sec.sectorType !== 'standing')
+                                    setFocusedSectionId(sec._id || sec._localId);
                             }}
-                        >
-                            ★ POZORNICA ★
-                        </div>
+                            onGaChange={setGaQty}
+                        />
+                    ) : (
+                        <SectionSeatPicker
+                            section={focusedSection}
+                            seats={seatsBySection[focusedSectionId] || []}
+                            selectedSeatIds={selectedSeatIds}
+                            onToggle={toggleSeat}
+                        />
+                    )}
+                </div>
+
+                {/* Cart sidebar */}
+                <div style={{
+                    width: 300, background: '#fff', borderLeft: '1px solid #e2e8f0',
+                    display: 'flex', flexDirection: 'column', flexShrink: 0,
+                }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
+                        <FaShoppingCart style={{ marginRight: 8, color: '#3b82f6' }} />
+                        Izabrane karte
                     </div>
 
-                    {/* SEKTORI */}
-                    {sectorOrder.filter((s) => grouped[s]).map((sectorName) => {
-                        const colors = SECTOR_COLORS[sectorName];
-                        const rows = grouped[sectorName];
-
-                        return (
-                            <div key={sectorName} className="mb-4">
-                                {/* Sektor naslov */}
-                                <div className="d-flex align-items-center gap-2 mb-2">
-                                    <div
-                                        style={{
-                                            width: 14, height: 14,
-                                            borderRadius: 3,
-                                            backgroundColor: colors.free,
-                                        }}
-                                    />
-                                    <span className="fw-bold text-uppercase small" style={{ letterSpacing: 1 }}>
-                                        {sectorName}
-                                    </span>
-                                    <span className="text-muted small">
-                                        — {seats.filter(s => s.sector === sectorName && !s.isReserved).length} slobodnih
-                                    </span>
-                                </div>
-
-                                {/* Redovi */}
-                                <div
-                                    style={{
-                                        background: '#f8fafc',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: 10,
-                                        padding: '12px 16px',
-                                        overflowX: 'auto',
-                                    }}
-                                >
-                                    {Object.entries(rows).map(([row, rowSeats]) => (
-                                        <div
-                                            key={row}
-                                            className="d-flex align-items-center mb-1"
-                                            style={{ gap: SEAT_GAP }}
-                                        >
-                                            {/* Oznaka reda */}
-                                            <span
-                                                style={{
-                                                    width: 36,
-                                                    fontSize: '0.7rem',
-                                                    color: '#64748b',
-                                                    fontWeight: 700,
-                                                    flexShrink: 0,
-                                                    textAlign: 'right',
-                                                    paddingRight: 6,
-                                                }}
-                                            >
-                                                {row}
-                                            </span>
-
-                                            {/* Sedišta */}
-                                            {rowSeats.map((seat) => {
-                                                const isSelected = selected.has(seat._id);
-                                                const isReserved = seat.isReserved;
-
-                                                let bg = colors.free;
-                                                if (isReserved) bg = colors.reserved;
-                                                else if (isSelected) bg = colors.selected;
-
-                                                return (
-                                                    <div
-                                                        key={seat._id}
-                                                        onClick={() => toggleSeat(seat)}
-                                                        title={
-                                                            isReserved
-                                                                ? 'Zauzeto'
-                                                                : `${sectorName} — Red ${row}, Mesto ${seat.seatNumber}\n${seat.price} RSD`
-                                                        }
-                                                        style={{
-                                                            width: SEAT_SIZE,
-                                                            height: SEAT_SIZE,
-                                                            borderRadius: '4px 4px 0 0',
-                                                            backgroundColor: bg,
-                                                            border: isSelected ? '2px solid #ea580c' : '1px solid rgba(0,0,0,0.1)',
-                                                            cursor: isReserved ? 'not-allowed' : 'pointer',
-                                                            transition: 'transform 0.1s, background 0.1s',
-                                                            flexShrink: 0,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            fontSize: '0.55rem',
-                                                            color: isReserved ? '#9ca3af' : '#1e293b',
-                                                            fontWeight: 600,
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            if (!isReserved && !isSelected) {
-                                                                e.currentTarget.style.backgroundColor = colors.hover;
-                                                                e.currentTarget.style.transform = 'scale(1.15)';
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (!isReserved && !isSelected) {
-                                                                e.currentTarget.style.backgroundColor = colors.free;
-                                                                e.currentTarget.style.transform = 'scale(1)';
-                                                            }
-                                                        }}
-                                                    >
-                                                        {seat.seatNumber}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ))}
-                                </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+                        {cartItems.length === 0 ? (
+                            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 0', fontSize: 13 }}>
+                                <FaChair style={{ fontSize: 32, marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+                                <p>Klikni na sekciju da izabereš sedišta</p>
                             </div>
-                        );
-                    })}
-
-                    {/* LEGENDA */}
-                    <div className="d-flex flex-wrap gap-3 mt-3">
-                        {Object.entries(SECTOR_COLORS).map(([sector, colors]) => (
-                            <div key={sector} className="d-flex align-items-center gap-1">
-                                <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: colors.free }} />
-                                <small className="text-muted">{sector}</small>
+                        ) : cartItems.map((item, i) => (
+                            <div key={i} style={{
+                                padding: '8px 10px', marginBottom: 6,
+                                background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0',
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                                    <span style={{ fontWeight: 600, fontSize: 12 }}>
+                                        {item.sectorType === 'standing'
+                                            ? <><FaRunning style={{ marginRight: 3 }} />{item.sectionName}</>
+                                            : item.ticketTypeName}
+                                    </span>
+                                    <span style={{ fontWeight: 700, fontSize: 12, color: '#0f766e' }}>
+                                        {(item.qty * item.price).toLocaleString()} RSD
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: '#64748b' }}>
+                                    {item.qty}× {item.price.toLocaleString()} RSD
+                                    {item.sectorType === 'seated' && item.seats.length <= 6 && (
+                                        <> · {item.seats.map(s => `${s.row}${s.seatNumber}`).join(', ')}</>
+                                    )}
+                                </div>
                             </div>
                         ))}
-                        <div className="d-flex align-items-center gap-1">
-                            <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: '#f97316' }} />
-                            <small className="text-muted">Izabrano</small>
-                        </div>
-                        <div className="d-flex align-items-center gap-1">
-                            <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: '#e5e7eb', border: '1px solid #ccc' }} />
-                            <small className="text-muted">Zauzeto</small>
-                        </div>
                     </div>
-                </Col>
 
-                {/* PANEL DESNO */}
-                <Col lg={3}>
-                    <Card className="shadow-sm border-0 p-3 sticky-top" style={{ top: 20 }}>
-                        <h6 className="mb-3 d-flex align-items-center gap-2">
-                            <FaTicketAlt /> Izabrana sedišta
-                            {selected.size > 0 && (
-                                <Badge bg="primary">{selected.size}</Badge>
-                            )}
-                        </h6>
-
-                        {selectedSeats.length === 0 ? (
-                            <p className="text-muted small">Kliknite na slobodno sedište na mapi.</p>
-                        ) : (
-                            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                                {selectedSeats.map((s) => (
-                                    <div
-                                        key={s._id}
-                                        className="d-flex justify-content-between align-items-center py-1 border-bottom"
-                                    >
-                                        <div>
-                                            <div className="small fw-bold">
-                                                {s.sector} — Red {s.row}, Mesto {s.seatNumber}
-                                            </div>
-                                            <div className="small text-muted">{s.ticketTypeName}</div>
-                                        </div>
-                                        <div className="d-flex align-items-center gap-2">
-                                            <span className="small fw-bold" style={{ color: '#ff940a' }}>
-                                                {s.price} RSD
-                                            </span>
-                                            <button
-                                                className="btn btn-sm btn-outline-danger py-0 px-1"
-                                                style={{ fontSize: '0.7rem' }}
-                                                onClick={() => toggleSeat(s)}
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <hr />
-                        <div className="d-flex justify-content-between mb-3">
-                            <span className="fw-bold">Ukupno</span>
-                            <span className="fw-bold" style={{ color: '#ff940a' }}>
-                                {totalPrice.toFixed(2)} RSD
+                    <div style={{ padding: '12px 16px', borderTop: '2px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <span style={{ fontWeight: 600 }}>Ukupno</span>
+                            <span style={{ fontWeight: 700, fontSize: 16, color: '#0f766e' }}>
+                                {totalPrice.toLocaleString()} RSD
                             </span>
                         </div>
-
-                        <div className="d-grid">
-                            <Button
-                                variant="primary"
-                                disabled={selected.size === 0}
-                                onClick={handleAddToCart}
-                            >
-                                <FaTicketAlt className="me-2" />
-                                Dodaj u korpu
-                            </Button>
-                        </div>
-
-                        {selected.size > 0 && (
-                            <Button
-                                variant="link"
-                                className="mt-2 text-danger small p-0"
-                                onClick={() => setSelected(new Set())}
-                            >
-                                Poništi izbor
-                            </Button>
-                        )}
-                    </Card>
-                </Col>
-            </Row>
+                        <Button variant="success" className="w-100" disabled={!totalItems} onClick={handleAddToCart}>
+                            <FaShoppingCart className="me-2" />
+                            Dodaj u korpu ({totalItems})
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
-};
+}
 
-export default SeatMapScreen;
+// ─── Overview SVG map ─────────────────────────────────────────────────────────
+function VenueOverviewMap({ sections, decorations, seatsBySection, selectedSeatIds, gaQuantities, onSectionClick, onGaChange }) {
+    const [hovered, setHovered] = useState(null);
+
+    const allObjs = [...sections, ...decorations];
+    if (!allObjs.length) return null;
+
+    const minX = Math.min(...allObjs.map(o => o.x)) - 20;
+    const minY = Math.min(...allObjs.map(o => o.y)) - 20;
+    const maxX = Math.max(...allObjs.map(o => o.x + (o.width || 100))) + 20;
+    const maxY = Math.max(...allObjs.map(o => o.y + (o.height || 60))) + 20;
+
+    return (
+        <div>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                Klikni na sekciju da izabereš konkretna mesta. GA zone — koristi +/− direktno ispod.
+            </p>
+
+            <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`}
+                style={{ width: '100%', maxWidth: 900, display: 'block', margin: '0 auto' }}>
+
+                <defs>
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <circle cx="1" cy="1" r="0.8" fill="#cbd5e1" />
+                    </pattern>
+                </defs>
+                <rect x={minX} y={minY} width={maxX - minX} height={maxY - minY} fill="url(#grid)" />
+
+                {/* Decorations */}
+                {decorations.map((d, i) => (
+                    <g key={i}>
+                        <rect x={d.x} y={d.y} width={d.width} height={d.height}
+                            fill={d.type === 'stage' ? d.color : d.type === 'entrance' ? '#d1fae5' : 'transparent'}
+                            stroke={d.type === 'label' ? '#94a3b8' : d.color}
+                            strokeWidth={1.5} strokeDasharray={d.type === 'label' ? '4 2' : 'none'} rx={6} />
+                        <text x={d.x + d.width / 2} y={d.y + d.height / 2 + 5}
+                            textAnchor="middle"
+                            fill={d.type === 'stage' ? '#fff' : d.color}
+                            fontSize={Math.min(d.fontSize || 13, d.height * 0.55)}
+                            fontWeight="700" letterSpacing={d.type === 'stage' ? 3 : 0}>
+                            {d.label}
+                        </text>
+                    </g>
+                ))}
+
+                {/* Sections */}
+                {sections.map(sec => {
+                    const id = sec._id || sec._localId;
+                    const secSeats = seatsBySection[id] || [];
+                    const selectedInSec = sec.sectorType === 'seated'
+                        ? secSeats.filter(s => selectedSeatIds.has(s._id)).length
+                        : (gaQuantities[id] || 0);
+                    const isHovered = hovered === id;
+
+                    return (
+                        <g key={id} style={{ cursor: sec.sectorType === 'standing' ? 'default' : 'pointer' }}
+                            onClick={() => onSectionClick(sec)}
+                            onMouseEnter={() => setHovered(id)}
+                            onMouseLeave={() => setHovered(null)}
+                        >
+                            <rect x={sec.x} y={sec.y} width={sec.width} height={sec.height}
+                                fill={sec.color + '22'}
+                                stroke={selectedInSec > 0 ? '#22c55e' : isHovered ? sec.color : sec.color + '88'}
+                                strokeWidth={selectedInSec > 0 ? 3 : isHovered ? 2.5 : 2}
+                                strokeDasharray={sec.sectorType === 'standing' ? '6 3' : 'none'}
+                                rx={8} />
+
+                            {/* Name header */}
+                            <rect x={sec.x} y={sec.y} width={sec.width} height={26}
+                                fill={sec.color + 'dd'} rx={8} />
+                            <rect x={sec.x} y={sec.y + 18} width={sec.width} height={8} fill={sec.color + 'dd'} />
+                            <text x={sec.x + sec.width / 2} y={sec.y + 17}
+                                textAnchor="middle" fill="#fff"
+                                fontSize={Math.min(13, sec.width / 10)} fontWeight="700">
+                                {sec.name}
+                            </text>
+
+                            {/* Center info */}
+                            <text x={sec.x + sec.width / 2} y={sec.y + sec.height / 2 + 4}
+                                textAnchor="middle" fill={sec.color}
+                                fontSize={Math.min(12, sec.width / 14)} fontWeight="700">
+                                {sec.sectorType === 'standing' ? 'GA zona' : `${sec.rowCount}r × ${sec.seatsPerRow}m`}
+                            </text>
+                            <text x={sec.x + sec.width / 2} y={sec.y + sec.height / 2 + 18}
+                                textAnchor="middle" fill="#475569" fontSize={Math.min(11, sec.width / 16)}>
+                                {sec.price.toLocaleString()} RSD · {sec.ticketTypeName}
+                            </text>
+
+                            {selectedInSec > 0 && (
+                                <text x={sec.x + sec.width / 2} y={sec.y + sec.height - 10}
+                                    textAnchor="middle" fill="#16a34a" fontSize={11} fontWeight="700">
+                                    ✓ {selectedInSec} izabrano
+                                </text>
+                            )}
+                            {isHovered && sec.sectorType === 'seated' && !selectedInSec && (
+                                <text x={sec.x + sec.width / 2} y={sec.y + sec.height - 10}
+                                    textAnchor="middle" fill={sec.color} fontSize={10} fontWeight="600">
+                                    Klikni za izbor sedišta →
+                                </text>
+                            )}
+                        </g>
+                    );
+                })}
+            </svg>
+
+            {/* GA cards */}
+            {sections.filter(s => s.sectorType === 'standing').length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                    <p style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 8 }}>GA / Standing zone</p>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        {sections.filter(s => s.sectorType === 'standing').map(sec => {
+                            const id   = sec._id || sec._localId;
+                            const pool = (seatsBySection[id] || []).filter(s => !s.isReserved);
+                            const qty  = gaQuantities[id] || 0;
+                            return (
+                                <GACard key={id} section={sec} available={pool.length}
+                                    qty={qty} onChange={q => onGaChange(sec, q)} />
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── GA card ──────────────────────────────────────────────────────────────────
+function GACard({ section: s, available, qty, onChange }) {
+    return (
+        <div style={{
+            border: `2px solid ${s.color}`, borderRadius: 10,
+            padding: '14px 16px', background: s.color + '10', minWidth: 200,
+        }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: s.color, marginBottom: 2 }}>
+                <FaRunning style={{ marginRight: 5 }} />{s.name}
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
+                {s.price.toLocaleString()} RSD · {s.ticketTypeName}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button onClick={() => onChange(qty - 1)} disabled={qty === 0}
+                    style={{
+                        width: 32, height: 32, borderRadius: 6,
+                        border: '1.5px solid #e2e8f0', background: '#fff',
+                        cursor: qty === 0 ? 'not-allowed' : 'pointer',
+                        fontWeight: 700, fontSize: 16,
+                    }}>−</button>
+                <span style={{ fontWeight: 700, fontSize: 18, minWidth: 28, textAlign: 'center', color: qty > 0 ? '#0f766e' : '#374151' }}>
+                    {qty}
+                </span>
+                <button onClick={() => onChange(qty + 1)} disabled={available === 0}
+                    style={{
+                        width: 32, height: 32, borderRadius: 6,
+                        border: '1.5px solid #e2e8f0', background: '#fff',
+                        cursor: available === 0 ? 'not-allowed' : 'pointer',
+                        fontWeight: 700, fontSize: 16,
+                    }}>+</button>
+            </div>
+        </div>
+    );
+}
+
+// ─── Section seat picker ──────────────────────────────────────────────────────
+function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle }) {
+    const [filter, setFilter] = useState('all');
+    if (!section) return null;
+
+    const byRow = seats.reduce((acc, seat) => {
+        if (!acc[seat.row]) acc[seat.row] = [];
+        acc[seat.row].push(seat);
+        return acc;
+    }, {});
+
+    const rows = Object.keys(byRow).sort();
+
+    const filtered = rows.map(row => ({
+        row,
+        seats: byRow[row].filter(s => {
+            if (filter === 'free')     return !s.isReserved;
+            if (filter === 'selected') return selectedSeatIds.has(s._id);
+            return true;
+        }),
+    })).filter(r => r.seats.length > 0);
+
+    const selectedInSection = seats.filter(s => selectedSeatIds.has(s._id)).length;
+
+    return (
+        <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div style={{ width: 14, height: 14, borderRadius: 3, background: section.color }} />
+                <span style={{ fontWeight: 700, fontSize: 16, color: '#1e293b' }}>{section.name}</span>
+                {selectedInSection > 0 && (
+                    <Badge bg="success">{selectedInSection} izabrano</Badge>
+                )}
+
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                    {[
+                        { v: 'all', l: 'Sva' },
+                        { v: 'free', l: 'Slobodna' },
+                        { v: 'selected', l: 'Izabrana' },
+                    ].map(f => (
+                        <button key={f.v} onClick={() => setFilter(f.v)}
+                            style={{
+                                padding: '4px 10px', borderRadius: 5, border: 'none',
+                                cursor: 'pointer', fontSize: 12,
+                                background: filter === f.v ? '#1e293b' : '#e2e8f0',
+                                color:      filter === f.v ? '#fff'    : '#374151',
+                                fontWeight: filter === f.v ? 700 : 400,
+                            }}>
+                            {f.l}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+                {[
+                    { color: section.color, label: 'Slobodno' },
+                    { color: '#22c55e',     label: 'Izabrano' },
+                    { color: '#e2e8f0',     label: 'Zauzeto'  },
+                    { color: '#1e293b',     label: 'Blokirano', opacity: 0.5 },
+                ].map(l => (
+                    <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+                        <div style={{ width: 14, height: 14, borderRadius: 3, background: l.color, opacity: l.opacity || 1 }} />
+                        {l.label}
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                    <div style={{ display: 'inline-block', padding: '4px 24px', background: '#1e293b', color: '#fff', borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>
+                        ▼ BINA
+                    </div>
+                </div>
+
+                {filtered.map(({ row, seats: rowSeats }) => (
+                    <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                        <div style={{ width: 28, textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                            {row}
+                        </div>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                            {rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => {
+                                const isSel     = selectedSeatIds.has(seat._id);
+                                const isRes     = seat.isReserved && !seat.isBlocked;
+                                const isBlocked = seat.isBlocked;
+                                return (
+                                    <button key={seat._id}
+                                        onClick={() => !isBlocked && onToggle(seat)}
+                                        disabled={isRes || isBlocked}
+                                        title={isBlocked ? `Blokirano mesto` : `${row}${seat.seatNumber} · ${seat.price} RSD`}
+                                        style={{
+                                            width: 20, height: 20, borderRadius: 3, padding: 0,
+                                            background: isBlocked ? '#1e293b' : isRes ? '#e2e8f0' : isSel ? '#22c55e' : section.color,
+                                            border: isSel ? '2px solid #fff' : '1px solid rgba(0,0,0,0.1)',
+                                            boxShadow: isSel ? `0 0 0 2px #22c55e` : 'none',
+                                            cursor: isBlocked ? 'not-allowed' : isRes ? 'not-allowed' : 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 7, color: isBlocked ? '#475569' : isRes ? '#9ca3af' : '#fff',
+                                            fontWeight: 700, flexShrink: 0,
+                                            opacity: isBlocked ? 0.5 : isRes ? 0.5 : 1,
+                                        }}
+                                        onMouseEnter={e => { if (!isRes && !isBlocked) e.currentTarget.style.transform = 'scale(1.2)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                                    >
+                                        {!isBlocked && seat.seatNumber}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div style={{ width: 28, fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                            {row}
+                        </div>
+                    </div>
+                ))}
+
+                {filtered.length === 0 && (
+                    <p style={{ textAlign: 'center', color: '#9ca3af', padding: '24px 0', fontSize: 13 }}>
+                        Nema sedišta za ovaj filter
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}

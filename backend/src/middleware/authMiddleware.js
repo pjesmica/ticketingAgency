@@ -12,21 +12,21 @@ const protect = asyncHandler(async (req, res, next) => {
             next();
         } catch (error) {
             res.status(401);
-            throw new Error('Nije autorizovano, token nije validan');
+            next(new Error('Nije autorizovano, token nije validan'));
         }
     } else {
         res.status(401);
-        throw new Error('Nije autorizovano, nema tokena');
+        next(new Error('Nije autorizovano, nema tokena'));
     }
 });
 
-// Admin middleware
+// Admin middleware — koristi next(error) umesto throw (Express 5 kompatibilno)
 const admin = (req, res, next) => {
     if (req.user && req.user.isAdmin) {
         next();
     } else {
         res.status(401);
-        throw new Error('Nije autorizovano kao administrator');
+        next(new Error('Nije autorizovano kao administrator'));
     }
 };
 

@@ -8,7 +8,7 @@ const orderItemSchema = new mongoose.Schema({
     },
     eventName: { type: String, required: true },
     eventDate: { type: Date, required: true },
-    eventVenue: { type: String, required: true },
+    eventVenue: { type: String, default: '' },
     ticketType: { type: String, required: true },
     ticketTypeId: { type: mongoose.Schema.Types.ObjectId, required: true },
     price: { type: Number, required: true },

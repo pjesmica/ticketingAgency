@@ -1,7 +1,6 @@
 import asyncHandler from '../middleware/asyncHandler.js';
 import Event from '../models/eventModel.js';
 
-// helper za search (čćšđž -> latin safe + lowercase)
 const normalizeText = (text) =>
     text
         ?.toString()
@@ -10,32 +9,49 @@ const normalizeText = (text) =>
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/\s/g, '');
 
-// helper za boolean (FIX za hasSeatMap bug)
 const toBoolean = (value) => value === true || value === 'true';
 
-// @desc    Dobavi sve aktivne događaje
-// @route   GET /api/events
-// @access  Public
+// -----------------------------
+// SYNC STATUS
+// -----------------------------
+const syncEventStatus = async () => {
+    const now = new Date();
+
+    await Event.updateMany(
+        {
+            startDate: { $lte: now },
+            endDate: { $gte: now },
+        },
+        { $set: { isActive: true } }
+    );
+
+    await Event.updateMany(
+        {
+            endDate: { $lt: now },
+        },
+        { $set: { isActive: false } }
+    );
+};
+
+// -----------------------------
+// GET EVENTS
+// -----------------------------
 const getEvents = asyncHandler(async (req, res) => {
+    await syncEventStatus();
+
     const keyword = req.query.keyword || '';
     const category = req.query.category || '';
-    const date = req.query.date || '';
 
-    const events = await Event.find({ isActive: true }).sort({ startDate: 1 });
+    const events = await Event.find({
+        endDate: { $gte: new Date() },
+    }).sort({ startDate: 1 });
 
     const normalizedKeyword = normalizeText(keyword);
-    const normalizedDate = date
-        ? new Date(date).toISOString().split('T')[0]
-        : null;
 
     const filtered = events.filter((event) => {
         const haystack = normalizeText(
             `${event.name} ${event.category} ${event.venue?.city} ${event.venue?.name}`
         );
-
-        const eventDate = event.startDate
-            ? new Date(event.startDate).toISOString().split('T')[0]
-            : null;
 
         const matchKeyword = normalizedKeyword
             ? haystack.includes(normalizedKeyword)
@@ -45,58 +61,68 @@ const getEvents = asyncHandler(async (req, res) => {
             ? event.category === category
             : true;
 
-        const matchDate = normalizedDate
-            ? eventDate === normalizedDate
-            : true;
-
-        return matchKeyword && matchCategory && matchDate;
+        return matchKeyword && matchCategory;
     });
 
     res.status(200).json(filtered);
 });
 
-// @desc    Dobavi sve događaje (admin)
-// @route   GET /api/events/admin
-// @access  Private/Admin
+// -----------------------------
+// GET ALL EVENTS (ADMIN)
+// -----------------------------
 const getAllEventsAdmin = asyncHandler(async (req, res) => {
-    const events = await Event.find({}).sort({ createdAt: -1 });
+    await syncEventStatus();
+
+    const events = await Event.find({}).sort({ startDate: -1 });
+
     res.status(200).json(events);
 });
 
-// @desc    Dobavi jedan događaj po ID
-// @route   GET /api/events/:id
-// @access  Public
+// -----------------------------
+// GET BY ID
+// -----------------------------
 const getEventById = asyncHandler(async (req, res) => {
     const event = await Event.findById(req.params.id);
 
-    if (event) {
-        res.status(200).json(event);
-    } else {
+    if (!event) {
         res.status(404);
         throw new Error('Događaj nije pronađen');
     }
+
+    res.status(200).json(event);
 });
 
-// @desc    Kreiraj novi događaj
-// @route   POST /api/events
-// @access  Private/Admin
+// -----------------------------
+// CREATE EVENT
+// -----------------------------
 const createEvent = asyncHandler(async (req, res) => {
+    const start = req.body.startDate
+        ? new Date(req.body.startDate)
+        : new Date();
+
+    const end = req.body.endDate
+        ? new Date(req.body.endDate)
+        : new Date();
+
+    // kraj dana
+    end.setHours(23, 59, 59, 999);
+
     const event = new Event({
         createdBy: req.user._id,
         name: req.body.name || 'Novi događaj',
         image: req.body.image || '/images/placeholder.jpg',
-        description: req.body.description || 'Opis događaja',
+        ticketImage: req.body.ticketImage || '',
+        description: req.body.description || '',
         category: req.body.category || 'Ostalo',
+
         venue: req.body.venue || {
             name: 'Venue',
             city: 'Grad',
             address: '',
         },
 
-        startDate: req.body.startDate || new Date(),
-        endDate: req.body.endDate || new Date(),
-
-        time: req.body.time || '20:00',
+        startDate: start,
+        endDate: end,
 
         ticketTypes: req.body.ticketTypes || [
             {
@@ -107,65 +133,74 @@ const createEvent = asyncHandler(async (req, res) => {
             },
         ],
 
-        isActive:
-            req.body.isActive !== undefined
-                ? req.body.isActive
-                : false,
-
+        isActive: true,
         hasSeatMap: toBoolean(req.body.hasSeatMap),
     });
 
-    const createdEvent = await event.save();
-    res.status(201).json(createdEvent);
+    const created = await event.save();
+    res.status(201).json(created);
 });
 
-// @desc    Ažuriraj događaj
-// @route   PUT /api/events/:id
-// @access  Private/Admin
+// -----------------------------
+// UPDATE EVENT
+// -----------------------------
 const updateEvent = asyncHandler(async (req, res) => {
+    await syncEventStatus();
+
     const event = await Event.findById(req.params.id);
 
-    if (event) {
-        event.name = req.body.name || event.name;
-        event.image = req.body.image || event.image;
-        event.description = req.body.description || event.description;
-        event.category = req.body.category || event.category;
-        event.venue = req.body.venue || event.venue;
-
-        event.startDate = req.body.startDate || event.startDate;
-        event.endDate = req.body.endDate || event.endDate;
-
-        event.time = req.body.time || event.time;
-        event.ticketTypes = req.body.ticketTypes || event.ticketTypes;
-
-        event.isActive =
-            req.body.isActive !== undefined
-                ? req.body.isActive
-                : event.isActive;
-
-        event.hasSeatMap = toBoolean(req.body.hasSeatMap);
-
-        const updatedEvent = await event.save();
-        res.status(200).json(updatedEvent);
-    } else {
+    if (!event) {
         res.status(404);
         throw new Error('Događaj nije pronađen');
     }
+
+    event.name = req.body.name !== undefined ? req.body.name : event.name;
+    event.image = req.body.image !== undefined ? req.body.image : event.image;
+
+    event.ticketImage =
+        req.body.ticketImage !== undefined
+            ? req.body.ticketImage
+            : event.ticketImage;
+
+    event.description = req.body.description !== undefined ? req.body.description : event.description;
+    event.category = req.body.category !== undefined ? req.body.category : event.category;
+    event.venue = req.body.venue !== undefined ? req.body.venue : event.venue;
+
+    if (req.body.startDate) {
+        event.startDate = new Date(req.body.startDate);
+    }
+
+    if (req.body.endDate) {
+        const end = new Date(req.body.endDate);
+        end.setHours(23, 59, 59, 999);
+        event.endDate = end;
+    }
+
+    event.ticketTypes = req.body.ticketTypes !== undefined ? req.body.ticketTypes : event.ticketTypes;
+
+    // realtime status
+    event.isActive = new Date() <= new Date(event.endDate);
+
+    event.hasSeatMap = toBoolean(req.body.hasSeatMap);
+
+    const updated = await event.save();
+    res.status(200).json(updated);
 });
 
-// @desc    Obriši događaj
-// @route   DELETE /api/events/:id
-// @access  Private/Admin
+// -----------------------------
+// DELETE EVENT
+// -----------------------------
 const deleteEvent = asyncHandler(async (req, res) => {
     const event = await Event.findById(req.params.id);
 
-    if (event) {
-        await Event.deleteOne({ _id: event._id });
-        res.status(200).json({ message: 'Događaj uspešno obrisan' });
-    } else {
+    if (!event) {
         res.status(404);
         throw new Error('Događaj nije pronađen');
     }
+
+    await Event.deleteOne({ _id: event._id });
+
+    res.status(200).json({ message: 'Događaj obrisan' });
 });
 
 export {

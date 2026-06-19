@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-    createOrder, getOrderById, updateOrderToPaid,
+    createOrder, getOrderById, updateOrderToPaid, confirmFreeOrder,
     getMyOrders, getOrders,
 } from '../controllers/orderController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
@@ -11,5 +11,6 @@ router.route('/').post(protect, createOrder).get(protect, admin, getOrders);
 router.get('/myorders', protect, getMyOrders);
 router.route('/:id').get(protect, getOrderById);
 router.route('/:id/pay').put(protect, updateOrderToPaid);
+router.route('/:id/free').put(protect, confirmFreeOrder);
 
 export default router;

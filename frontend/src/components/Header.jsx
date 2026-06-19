@@ -40,6 +40,7 @@ const Header = () => {
             expand="md"
             bg="light"
             className="border-bottom shadow-sm"
+            style={{ position: 'relative', zIndex: 1030 }}
         >
             <Container>
 
@@ -117,6 +118,13 @@ const Header = () => {
                                         <NavDropdown.Header>
                                             ADMIN
                                         </NavDropdown.Header>
+
+                                        <LinkContainer to="/admin">
+                                            <NavDropdown.Item>
+                                                <FaBolt className="me-2" />
+                                                Dashboard
+                                            </NavDropdown.Item>
+                                        </LinkContainer>
 
                                         <LinkContainer to="/admin/events">
                                             <NavDropdown.Item>

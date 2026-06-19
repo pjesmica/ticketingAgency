@@ -4,7 +4,6 @@ import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import {
     FaMapMarkerAlt,
     FaCalendarAlt,
-    FaClock,
     FaTicketAlt,
     FaArrowLeft,
     FaMinus,
@@ -81,7 +80,6 @@ const EventScreen = () => {
     const handleChooseSeats = () => {
         if (!userInfo) {
             toast.info('Morate biti prijavljeni');
-
             navigate(`/login?redirect=/events/${id}/seats`);
             return;
         }
@@ -100,30 +98,27 @@ const EventScreen = () => {
             </Container>
         );
 
-    // START / END DATE
-    const startDate = event.startDate
+    // -----------------------------
+    // EVENT DATE
+    // -----------------------------
+    const eventDate = event.startDate
         ? new Date(event.startDate)
         : null;
 
-    const endDate = event.endDate
-        ? new Date(event.endDate)
-        : null;
+    const formattedDate = eventDate
+        ? eventDate.toLocaleDateString('sr-Latn-RS', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+          })
+        : '';
 
-    // FORMAT DATE
-    const formatDate = (date) =>
-        date.toLocaleDateString('sr-Latn-RS', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-        });
-
-    // DATE DISPLAY
-    const formattedDate = startDate
-        ? endDate &&
-          startDate.getTime() !== endDate.getTime()
-            ? `${formatDate(startDate)} - ${formatDate(endDate)}`
-            : formatDate(startDate)
+    const formattedTime = eventDate
+        ? eventDate.toLocaleTimeString('sr-RS', {
+              hour: '2-digit',
+              minute: '2-digit',
+          })
         : '';
 
     const totalSelected = Object.values(quantities).reduce(
@@ -133,8 +128,7 @@ const EventScreen = () => {
 
     const totalPrice =
         event.ticketTypes?.reduce(
-            (a, t) =>
-                a + (quantities[t._id] || 0) * t.price,
+            (a, t) => a + (quantities[t._id] || 0) * t.price,
             0
         ) || 0;
 
@@ -150,7 +144,6 @@ const EventScreen = () => {
             </Button>
 
             <Row className="g-4">
-
                 {/* LEFT */}
                 <Col lg={7}>
                     <Card className="mb-4 overflow-hidden">
@@ -169,49 +162,41 @@ const EventScreen = () => {
                     </Card>
 
                     <Card className="mb-4 p-3">
-                        <h3 className="mb-2">
-                            {event.name}
-                        </h3>
+                        <h3 className="mb-2">{event.name}</h3>
 
                         <p className="text-muted mb-3">
                             {event.description}
                         </p>
 
                         <div className="d-flex flex-column gap-2">
-
                             <div className="d-flex align-items-center gap-2">
                                 <FaCalendarAlt />
                                 <span>{formattedDate}</span>
                             </div>
 
                             <div className="d-flex align-items-center gap-2">
-                                <FaClock />
-                                <span>{event.time}h</span>
+                                <span className="fw-bold">
+                                    {formattedTime}h
+                                </span>
                             </div>
 
                             <div className="d-flex align-items-center gap-2">
                                 <FaMapMarkerAlt />
-
                                 <span>
-                                    {event.venue?.name},
-                                    {' '}
+                                    {event.venue?.name},{' '}
                                     {event.venue?.city}
                                     {event.venue?.country
                                         ? `, ${event.venue.country}`
                                         : ''}
                                 </span>
                             </div>
-
                         </div>
                     </Card>
                 </Col>
 
                 {/* RIGHT */}
                 <Col lg={5}>
-                    <Card
-                        className="p-3 sticky-top"
-                        style={{ top: '20px' }}
-                    >
+                    <Card className="p-3 sticky-top" style={{ top: '20px', zIndex: 10 }}>
                         <h5 className="mb-3">
                             <FaTicketAlt className="me-2" />
                             Izaberi karte
@@ -221,7 +206,6 @@ const EventScreen = () => {
                             <>
                                 <p className="text-muted small mb-3">
                                     Ovaj događaj ima numerisana sedišta.
-                                    Izaberite željeno mesto u dvorani.
                                 </p>
 
                                 <Button
@@ -230,7 +214,7 @@ const EventScreen = () => {
                                     onClick={handleChooseSeats}
                                 >
                                     <FaChair />
-                                    Izaberi sedište u dvorani
+                                    Izaberi sedište
                                 </Button>
                             </>
                         ) : (
@@ -245,14 +229,12 @@ const EventScreen = () => {
                                                 <div className="fw-bold">
                                                     {t.name}
                                                 </div>
-
                                                 <div className="text-success fw-bold">
                                                     {t.price} RSD
                                                 </div>
                                             </div>
 
                                             <div className="d-flex align-items-center gap-2">
-
                                                 <Button
                                                     size="sm"
                                                     variant="outline-secondary"
@@ -263,7 +245,9 @@ const EventScreen = () => {
                                                             t.availableQuantity
                                                         )
                                                     }
-                                                    disabled={!quantities[t._id]}
+                                                    disabled={
+                                                        !quantities[t._id]
+                                                    }
                                                 >
                                                     <FaMinus />
                                                 </Button>
@@ -282,32 +266,21 @@ const EventScreen = () => {
                                                             t.availableQuantity
                                                         )
                                                     }
-                                                    disabled={
-                                                        t.availableQuantity === 0
-                                                    }
                                                 >
                                                     <FaPlus />
                                                 </Button>
-
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <Message>
-                                        Nema karata
-                                    </Message>
+                                    <Message>Nema karata</Message>
                                 )}
 
                                 <hr />
 
                                 <div className="d-flex justify-content-between mb-3">
-                                    <span>
-                                        Ukupno ({totalSelected})
-                                    </span>
-
-                                    <strong>
-                                        {totalPrice} RSD
-                                    </strong>
+                                    <span>Ukupno ({totalSelected})</span>
+                                    <strong>{totalPrice} RSD</strong>
                                 </div>
 
                                 <Button
@@ -323,7 +296,6 @@ const EventScreen = () => {
                         )}
                     </Card>
                 </Col>
-
             </Row>
         </Container>
     );

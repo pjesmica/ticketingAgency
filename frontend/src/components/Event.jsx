@@ -13,26 +13,29 @@ const Event = ({ event }) => {
             : null;
 
     // START / END DATE
-    const startDate = event.startDate
-        ? new Date(event.startDate)
-        : null;
+    const startDate = event.startDate ? new Date(event.startDate) : null;
+    const endDate   = event.endDate   ? new Date(event.endDate)   : null;
 
-    const endDate = event.endDate
-        ? new Date(event.endDate)
-        : null;
-
-    // FORMAT DATE
+    // FORMAT DATE — "15. januar 2025."
     const formatDate = (date) =>
-        `${date.getDate()}. ${date.toLocaleString('sr-Latn-RS', {
-            month: 'long',
-        })} ${date.getFullYear()}`;
+        `${date.getDate()}. ${date.toLocaleString('sr-Latn-RS', { month: 'long' })} ${date.getFullYear()}.`;
 
-    // DATE DISPLAY
+    // TIME FROM DATE
+    const formattedTime = startDate
+        ? startDate.toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+    // Poređenje samo po datumu (bez vremena)
+    const sameDay = (a, b) =>
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth()    === b.getMonth()    &&
+        a.getDate()     === b.getDate();
+
+    // Jedan datum ako isti dan, opseg ako višednevni
     const formattedDate = startDate
-        ? endDate &&
-          startDate.getTime() !== endDate.getTime()
-            ? `${formatDate(startDate)} - ${formatDate(endDate)}`
-            : formatDate(startDate)
+        ? (endDate && !sameDay(startDate, endDate)
+            ? `${formatDate(startDate)} — ${formatDate(endDate)}`
+            : formatDate(startDate))
         : '';
 
     const eventId = event?._id;
@@ -88,7 +91,7 @@ const Event = ({ event }) => {
 
                         <div className="d-flex align-items-center gap-2">
                             <FaClock />
-                            {event.time}h
+                            {formattedTime}h
                         </div>
 
                         <div className="d-flex align-items-center gap-2">

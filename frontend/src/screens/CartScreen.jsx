@@ -10,9 +10,18 @@ const CartScreen = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { cartItems } = useSelector((state) => state.cart);
+    const { userInfo }  = useSelector((state) => state.auth);
 
     const totalItems = cartItems.reduce((a, c) => a + c.quantity, 0);
     const totalPrice = cartItems.reduce((a, c) => a + c.price * c.quantity, 0);
+
+    const handleCheckout = () => {
+        if (!userInfo) {
+            navigate('/login?redirect=/placeorder');
+        } else {
+            navigate('/placeorder');
+        }
+    };
 
     const handleQty = (item, qty) => {
         if (qty < 1) return;
@@ -185,7 +194,7 @@ const CartScreen = () => {
                             <Button
                                 variant="success"
                                 className="w-100 d-flex align-items-center justify-content-center gap-2"
-                                onClick={() => navigate('/placeorder')}
+                                onClick={handleCheckout}
                             >
                                 Nastavi
                                 <FaArrowRight />

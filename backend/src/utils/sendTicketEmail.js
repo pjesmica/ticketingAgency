@@ -48,7 +48,7 @@ export const sendTicketEmail = async ({ order, event }) => {
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; color: #222;">
       <h2 style="color:#1a1a2e;">Hvala na kupovini 🎉</h2>
 
-      <p>Poštovani <strong>${userName}</strong>,</p>
+      <p>Poštovani/a <strong>${userName}</strong>,</p>
 
       <p>U prilogu se nalaze Vaše ulaznice za događaj:</p>
 

@@ -3,6 +3,7 @@ import Order from "../models/orderModel.js";
 import Event from "../models/eventModel.js";
 import { reserveSeats } from "./seatController.js";
 import { sendTicketEmail } from "../utils/sendTicketEmail.js";
+import { generateTicketPdf } from "../utils/generateTicketPdf.js";
 
 // @desc    Kreiraj novu narudžbinu (kupi karte)
 // @route   POST /api/orders
@@ -188,6 +189,67 @@ const confirmFreeOrder = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Preuzmi PDF pojedinačne karte iz narudžbine
+// @route   GET /api/orders/:id/tickets/:itemIndex/:qtyIndex/pdf
+// @access  Private (vlasnik narudžbine ili admin)
+const getOrderTicketPdf = asyncHandler(async (req, res) => {
+  const { id, itemIndex, qtyIndex } = req.params;
+
+  const order = await Order.findById(id).populate("user", "name email");
+  if (!order) {
+    res.status(404);
+    throw new Error("Narudžbina nije pronađena");
+  }
+  if (
+    order.user._id.toString() !== req.user._id.toString() &&
+    !req.user.isAdmin
+  ) {
+    res.status(401);
+    throw new Error("Nije autorizovano");
+  }
+  if (!order.isPaid) {
+    res.status(400);
+    throw new Error("Karta nije dostupna — narudžbina nije plaćena");
+  }
+
+  const itemIdx = parseInt(itemIndex, 10);
+  const qIdx = parseInt(qtyIndex, 10);
+  const orderItem = order.orderItems[itemIdx];
+
+  if (!orderItem || isNaN(qIdx) || qIdx < 0 || qIdx >= orderItem.quantity) {
+    res.status(404);
+    throw new Error("Karta nije pronađena");
+  }
+
+  // Globalni indeks karte u okviru cele narudžbine — isti kao pri slanju mejla,
+  // da barkod ostane konzistentan bez obzira da li je karta preuzeta ili poslata mejlom.
+  let globalTicketIndex = 0;
+  for (let i = 0; i < itemIdx; i++) {
+    globalTicketIndex += order.orderItems[i].quantity;
+  }
+  globalTicketIndex += qIdx;
+
+  const event = await Event.findById(orderItem.eventId);
+  if (!event) {
+    res.status(404);
+    throw new Error("Događaj nije pronađen");
+  }
+
+  const pdfBuffer = await generateTicketPdf({
+    order,
+    orderItem,
+    event,
+    ticketIndex: globalTicketIndex,
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="ulaznica-${globalTicketIndex + 1}.pdf"`
+  );
+  res.send(pdfBuffer);
+});
+
 // @desc    Dobavi narudžbine prijavljenog korisnika
 // @route   GET /api/orders/myorders
 // @access  Private
@@ -215,4 +277,5 @@ export {
   confirmFreeOrder,
   getMyOrders,
   getOrders,
+  getOrderTicketPdf,
 };

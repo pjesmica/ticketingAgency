@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import CheckoutSteps from '../components/CheckoutSteps';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import CountdownTimer from '../components/CountdownTimer';
 import { useGetOrderDetailsQuery, usePayOrderMutation, useGetPayPalClientIdQuery, useConfirmFreeOrderMutation } from '../slices/ordersApiSlice';
 
 const OrderScreen = () => {
@@ -54,7 +55,7 @@ const OrderScreen = () => {
             try {
                 await payOrder({ orderId, details }).unwrap();
                 refetch();
-                toast.success('Plaćanje uspešno! Karte su rezervisane. 🎉');
+                toast.success('Plaćanje uspešno! Karte su Vam poslate na mejl.');
             } catch (err) {
                 toast.error(err?.data?.message || 'Greška pri obradi plaćanja');
             }
@@ -77,10 +78,10 @@ const OrderScreen = () => {
             {/* ── Header ── */}
             {order.isPaid ? (
                 <div className="text-center mb-5">
-                    <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
+                    {/* <div style={{ fontSize: 64, marginBottom: 12 }}></div> */}
                     <h2 className="fw-bold text-success">Plaćanje uspešno!</h2>
                     <p className="text-muted">
-                        Hvala na kupovini! Vaše karte su rezervisane.
+                        Hvala na kupovini! Vaše karte su Vam poslate na mejl.
                     </p>
                     <Button variant="outline-success" onClick={() => navigate('/myorders')}>
                         <FaTicketAlt className="me-2" />
@@ -97,6 +98,13 @@ const OrderScreen = () => {
                     <p className="text-muted small mb-0">
                         Narudžbina #{order._id.slice(-8).toUpperCase()}
                     </p>
+                    <Alert variant="warning" className="d-inline-flex align-items-center gap-2 mt-2 py-2 px-3 mb-0">
+                        <FaClock />
+                        <span>
+                            Karte su rezervisane još:{' '}
+                            <CountdownTimer expiresAt={order.expiresAt} className="fw-bold font-monospace" />
+                        </span>
+                    </Alert>
                 </div>
             )}
 

@@ -1,11 +1,47 @@
-import { Badge, Card, Col, Row, Accordion, Table } from 'react-bootstrap';
-import { FaTicketAlt, FaCalendarAlt, FaMapMarkerAlt, FaClock } from 'react-icons/fa';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Badge, Card, Col, Row, Accordion, Table, Button, Spinner, Alert } from 'react-bootstrap';
+import { FaTicketAlt, FaCalendarAlt, FaMapMarkerAlt, FaClock, FaDownload, FaCreditCard } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import { useGetMyOrdersQuery } from '../slices/ordersApiSlice';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
+import CountdownTimer from '../components/CountdownTimer';
 
 const MyOrdersScreen = () => {
+    const navigate = useNavigate();
     const { data: orders, isLoading, error } = useGetMyOrdersQuery();
+    const [downloadingKey, setDownloadingKey] = useState(null);
+
+    const handleDownloadTicket = async (orderId, itemIndex, qtyIndex, ticketLabel) => {
+        const key = `${orderId}-${itemIndex}-${qtyIndex}`;
+        setDownloadingKey(key);
+        try {
+            const res = await fetch(
+                `/api/orders/${orderId}/tickets/${itemIndex}/${qtyIndex}/pdf`,
+                { method: 'GET', credentials: 'include' }
+            );
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Greška pri preuzimanju karte');
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ulaznica-${ticketLabel}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            toast.error(err.message || 'Greška pri preuzimanju karte');
+        } finally {
+            setDownloadingKey(null);
+        }
+    };
 
     if (isLoading) return <Loader />;
     if (error) return <Message variant="danger">Greška pri učitavanju narudžbina</Message>;
@@ -31,7 +67,6 @@ const MyOrdersScreen = () => {
             <Accordion defaultActiveKey="0" className="d-flex flex-column gap-3">
                 {orders.map((order, idx) => {
                     const totalQty = order.orderItems.reduce((a, i) => a + i.quantity, 0);
-
                     return (
                         <Accordion.Item
                             key={order._id}
@@ -70,6 +105,25 @@ const MyOrdersScreen = () => {
                             </Accordion.Header>
 
                             <Accordion.Body className="bg-white p-0">
+                                {/* Upozorenje za neplaćenu narudžbinu + dugme za plaćanje */}
+                                {!order.isPaid && (
+                                    <Alert variant="warning" className="m-3 mb-0 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+                                        <div className="small">
+                                            <FaClock className="me-1" />
+                                            Vreme do isteka rezervacije:{' '}
+                                            <CountdownTimer expiresAt={order.expiresAt} className="fw-bold font-monospace" />
+                                        </div>
+                                        <Button
+                                            variant="success"
+                                            size="sm"
+                                            onClick={() => navigate(`/orders/${order._id}`)}
+                                        >
+                                            <FaCreditCard className="me-2" />
+                                            Plati sada
+                                        </Button>
+                                    </Alert>
+                                )}
+
                                 {/* Detalji karata */}
                                 {order.orderItems.map((item, i) => (
                                     <div
@@ -101,6 +155,35 @@ const MyOrdersScreen = () => {
                                                     x{item.quantity}
                                                 </span>
                                             </div>
+
+                                            {/* Dugmad za preuzimanje PDF karte — jedno po svakoj pojedinačnoj karti */}
+                                            {order.isPaid && (
+                                                <div className="mt-2 d-flex flex-wrap gap-2">
+                                                    {Array.from({ length: item.quantity }).map((_, q) => {
+                                                        const key = `${order._id}-${i}-${q}`;
+                                                        const label = item.quantity > 1 ? `Karta ${q + 1}` : 'Karta';
+                                                        const isDownloading = downloadingKey === key;
+                                                        return (
+                                                            <Button
+                                                                key={q}
+                                                                variant="outline-success"
+                                                                size="sm"
+                                                                disabled={isDownloading}
+                                                                onClick={() =>
+                                                                    handleDownloadTicket(order._id, i, q, `${idx + 1}-${i + 1}-${q + 1}`)
+                                                                }
+                                                            >
+                                                                {isDownloading ? (
+                                                                    <Spinner animation="border" size="sm" className="me-1" />
+                                                                ) : (
+                                                                    <FaDownload className="me-1" />
+                                                                )}
+                                                                {label}
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="text-sm-end">

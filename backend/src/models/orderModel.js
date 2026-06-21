@@ -57,6 +57,12 @@ const orderSchema = new mongoose.Schema(
         paidAt: {
             type: Date,
         },
+        // Narudžbina koja nije plaćena do ovog trenutka se automatski
+        // briše, a rezervisana sedišta se oslobađaju (vidi utils/expireOrders.js)
+        expiresAt: {
+            type: Date,
+            default: () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 dana
+        },
     },
     { timestamps: true }
 );

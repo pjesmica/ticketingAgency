@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 
 import connectDB from './config/db.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
+import expireUnpaidOrders from './utils/expireOrders.js';
 
 import eventRoutes from './routes/eventRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -67,4 +68,9 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Proveri istekle narudžbine odmah pri startu,
+  // pa zatim na svakih 30 minuta
+  expireUnpaidOrders();
+  setInterval(expireUnpaidOrders, 30 * 60 * 1000);
 });

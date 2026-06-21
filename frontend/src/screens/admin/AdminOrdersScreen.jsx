@@ -81,7 +81,7 @@ const AdminOrdersScreen = () => {
                                         )}
                                     </td>
                                     <td className='text-end'>
-                                        <LinkContainer to={`/order/${order._id}`}>
+                                        <LinkContainer to={`/admin/orders/${order._id}`}>
                                             <Button variant='outline-success' size='sm'>
                                                 <FaEye className='me-1' />
                                                 Pogledaj

@@ -204,7 +204,6 @@ export const generateTicketPdf = async ({ order, orderItem, event, ticketIndex }
         'Svaki naredni pokušaj ulaska sa iskorišćenom e-ulaznicom ili njenim kopijama neće biti moguć.',
         'Povraćaj novca za kupljenu e-ulaznicu nije moguć. Zamena e-ulaznice nije moguća.',
         'Prodavac ulaznice je posrednik pri prodaji ulaznica i ne odgovara za organizaciju događaja, promene u programu, datumu održavanja i satnici kao ni za eventualni povrat novca.',
-        'Za sve sporove koji ne mogu biti sporazumno rešeni nadležan je sud u Novom Sadu.',
       ];
 
       let currentY = usloviY + 16;

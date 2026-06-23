@@ -133,4 +133,12 @@ const reserveSeats = async (eventId, seatIds, userId, orderId) => {
     );
 };
 
-export { getSeatsForEvent, generateSeats, reserveSeats };
+// Oslobađa sva sedišta vezana za narudžbinu — koristi se pri otkazivanju
+const releaseSeats = async (orderId) => {
+    await Seat.updateMany(
+        { orderId },
+        { isReserved: false, reservedBy: null, orderId: null }
+    );
+};
+
+export { getSeatsForEvent, generateSeats, reserveSeats, releaseSeats };

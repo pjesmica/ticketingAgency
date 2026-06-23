@@ -20,6 +20,10 @@ export const eventsApiSlice = apiSlice.injectEndpoints({
             query: (eventId) => ({ url: `${EVENTS_URL}/${eventId}` }),
             keepUnusedDataFor: 5,
         }),
+        getEventBarcodes: builder.query({
+            query: (eventId) => ({ url: `${EVENTS_URL}/${eventId}/barcodes` }),
+            keepUnusedDataFor: 5,
+        }),
         createEvent: builder.mutation({
             query: (data) => ({
                 url: EVENTS_URL,
@@ -50,6 +54,7 @@ export const {
     useGetEventsQuery,
     useGetAllEventsAdminQuery,
     useGetEventDetailsQuery,
+    useGetEventBarcodesQuery,
     useCreateEventMutation,
     useUpdateEventMutation,
     useDeleteEventMutation,

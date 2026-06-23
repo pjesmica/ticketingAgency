@@ -1,6 +1,8 @@
 import express from 'express';
 import 'dotenv/config';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import connectDB from './config/db.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
@@ -16,6 +18,9 @@ import venueTemplateRoutes from './routes/venueTemplateRoutes.js';
 import venueSectionRoutes from './routes/venueSectionRoutes.js';
 import venueSectionTemplateRoutes from './routes/venueSectionTemplateRoutes.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+
 // DB
 connectDB();
 
@@ -24,6 +29,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Servira uploadovane slike kao statičke fajlove: GET /uploads/filename.jpg
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // ROUTES
 app.use('/api/events', eventRoutes);

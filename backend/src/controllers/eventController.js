@@ -1,5 +1,6 @@
 import asyncHandler from '../middleware/asyncHandler.js';
 import Event from '../models/eventModel.js';
+import Order from '../models/orderModel.js';
 
 const normalizeText = (text) =>
     text
@@ -203,6 +204,66 @@ const deleteEvent = asyncHandler(async (req, res) => {
     res.status(200).json({ message: 'Događaj obrisan' });
 });
 
+// -----------------------------
+// LISTA BARKODOVA ZA DOGAĐAJ (ADMIN)
+// -----------------------------
+// Barkod se NE čuva u bazi — generiše se uvek iznova kao `${order._id}-${ticketIndex}`
+// (ista logika kao u generateTicketPdf.js). Ova ruta tu logiku ponavlja za sve
+// PLAĆENE narudžbine koje sadrže ovaj događaj, da admin dobije kompletnu listu
+// barkodova koji se fizički nalaze na izdatim e-ulaznicama.
+const getEventBarcodes = asyncHandler(async (req, res) => {
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+        res.status(404);
+        throw new Error('Događaj nije pronađen');
+    }
+
+    const orders = await Order.find({
+        isPaid: true,
+        'orderItems.eventId': event._id,
+    })
+        .populate('user', 'name email')
+        .sort({ createdAt: 1 });
+
+    const tickets = [];
+
+    for (const order of orders) {
+        // Globalni indeks karte unutar cele narudžbine — mora ići kroz SVE stavke
+        // narudžbine (ne samo one za ovaj događaj), jer se tako računa i pri
+        // generisanju PDF-a / slanju mejla.
+        let globalTicketIndex = 0;
+
+        for (const item of order.orderItems) {
+            const belongsToEvent = item.eventId.toString() === event._id.toString();
+
+            for (let q = 0; q < item.quantity; q++) {
+                if (belongsToEvent) {
+                    const seat = item.seats?.[q] || null;
+                    tickets.push({
+                        barcode: `${order._id}-${globalTicketIndex}`,
+                        orderId: order._id.toString(),
+                        kupac: order.user?.name || 'N/A',
+                        email: order.user?.email || 'N/A',
+                        ticketType: item.ticketType,
+                        sektor: seat?.sector || '',
+                        red: seat?.row || '',
+                        mesto: seat?.seatNumber || '',
+                        placeno: order.paidAt,
+                    });
+                }
+                globalTicketIndex++;
+            }
+        }
+    }
+
+    res.status(200).json({
+        event: { _id: event._id, name: event.name },
+        count: tickets.length,
+        tickets,
+    });
+});
+
 export {
     getEvents,
     getAllEventsAdmin,
@@ -210,4 +271,5 @@ export {
     createEvent,
     updateEvent,
     deleteEvent,
+    getEventBarcodes,
 };

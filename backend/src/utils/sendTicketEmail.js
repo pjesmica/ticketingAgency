@@ -46,17 +46,17 @@ export const sendTicketEmail = async ({ order, event }) => {
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; color: #222;">
-      <h2 style="color:#1a1a2e;">Hvala na kupovini 🎉</h2>
-
+      <h2 style="color:#1a1a2e;">Hvala na kupovini!</h2>
+      <br>
       <p>Poštovani/a <strong>${userName}</strong>,</p>
 
       <p>U prilogu se nalaze Vaše ulaznice za događaj:</p>
 
       <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;">
         <h3 style="margin:0;">${event.name}</h3>
-        <p>📅 ${eventDate} u ${eventTime}h</p>
-        ${venueName ? `<p>📍 ${venueName}</p>` : ''}
-        <p>🎟️ Broj ulaznica: ${attachments.length}</p>
+        <p> ${eventDate} u ${eventTime}h</p>
+        ${venueName ? `<p> ${venueName}</p>` : ''}
+        <p> Broj ulaznica: ${attachments.length}</p>
       </div>
 
       <p>Molimo vas da ulaznice odštampate ili pokažete na telefonu pri ulazu.</p>

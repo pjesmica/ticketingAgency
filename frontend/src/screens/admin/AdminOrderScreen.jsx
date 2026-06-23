@@ -125,19 +125,29 @@ const AdminOrderScreen = () => {
                                                 <span className='text-muted small'>× {item.quantity}</span>
                                             </div>
                                             {item.seats?.length > 0 && (
-                                                <div className='mt-2 d-flex flex-wrap gap-1'>
-                                                    {item.seats.map((s, j) => (
-                                                        <Badge
-                                                            key={j}
-                                                            bg='light'
-                                                            text='dark'
-                                                            className='border font-monospace'
-                                                            style={{ fontSize: 10 }}
-                                                        >
-                                                            {s.sector ? `${s.sector} ` : ''}{s.row}{s.seatNumber}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
+                                                item.seats[0]?.row?.startsWith('GA-') ? (
+                                                    item.seats[0]?.sector && (
+                                                        <div className='mt-2'>
+                                                            <Badge bg='light' text='dark' className='border'>
+                                                                Zona: {item.seats[0].sector}
+                                                            </Badge>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div className='mt-2 d-flex flex-wrap gap-1'>
+                                                        {item.seats.map((s, j) => (
+                                                            <Badge
+                                                                key={j}
+                                                                bg='light'
+                                                                text='dark'
+                                                                className='border font-monospace'
+                                                                style={{ fontSize: 10 }}
+                                                            >
+                                                                {s.sector ? `${s.sector} ` : ''}{s.row}{s.seatNumber}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                )
                                             )}
                                         </div>
                                         <div className='text-end flex-shrink-0'>

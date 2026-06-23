@@ -9,6 +9,7 @@ import {
   FaCalendarAlt,
   FaMapMarkerAlt,
   FaTicketAlt,
+  FaBarcode,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import Message from "../../components/Message";
@@ -192,6 +193,16 @@ const AdminEventsScreen = () => {
                       <LinkContainer to={`/admin/events/${event._id}/edit`}>
                         <Button variant="outline-primary" size="sm">
                           <FaEdit />
+                        </Button>
+                      </LinkContainer>
+
+                      <LinkContainer to={`/admin/events/${event._id}/barcodes`}>
+                        <Button
+                          variant="outline-dark"
+                          size="sm"
+                          title="Lista barkodova"
+                        >
+                          <FaBarcode />
                         </Button>
                       </LinkContainer>
 

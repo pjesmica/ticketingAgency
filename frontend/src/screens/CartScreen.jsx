@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Button, Image, Card } from 'react-bootstrap';
+import { Container, Row, Col, Button, Card } from 'react-bootstrap';
 import { FaTrash, FaShoppingCart, FaArrowRight } from 'react-icons/fa';
 import { useDispatch, useSelector } from 'react-redux';
 import { removeFromCart, updateCartQty } from '../slices/cartSlice';
@@ -76,21 +76,6 @@ const CartScreen = () => {
                                 className="mb-3 p-3"
                             >
                                 <div className="d-flex align-items-center gap-3">
-
-                                    <Image
-                                        src={item.eventImage}
-                                        alt={item.eventName}
-                                        rounded
-                                        style={{
-                                            width: 80,
-                                            height: 60,
-                                            objectFit: 'cover'
-                                        }}
-                                        onError={(e) =>
-                                            (e.target.src =
-                                                'https://via.placeholder.com/80x60')
-                                        }
-                                    />
 
                                     {/* INFO */}
                                     <div className="flex-grow-1">

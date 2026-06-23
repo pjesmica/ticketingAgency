@@ -35,6 +35,7 @@ import AdminVenueTemplatesScreen from "./screens/admin/AdminVenueTemplatesScreen
 import PlaceOrderScreen from "./screens/PlaceOrderScreen";
 import OrderScreen from "./screens/OrderScreen";
 import AdminOrderScreen from "./screens/admin/AdminOrderScreen";
+import AdminEventBarcodesScreen from "./screens/admin/AdminEventBarcodesScreen";
 
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import reportWebVitals from "./reportWebVitals";
@@ -70,6 +71,10 @@ const router = createBrowserRouter(
         <Route
           path="/admin/events/:id/edit"
           element={<AdminEventEditScreen />}
+        />
+        <Route
+          path="/admin/events/:id/barcodes"
+          element={<AdminEventBarcodesScreen />}
         />
         <Route path="/admin/users" element={<AdminUsersScreen />} />
         <Route path="/admin/users/:id/edit" element={<AdminUserEditScreen />} />

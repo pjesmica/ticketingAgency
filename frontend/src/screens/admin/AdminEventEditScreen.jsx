@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Form, Button, Row, Col, Card, Badge } from "react-bootstrap";
+import { Form, Button, Row, Col, Card, Badge, Spinner } from "react-bootstrap";
 import {
   FaArrowLeft,
   FaSave,
@@ -13,6 +13,7 @@ import {
   FaTicketAlt,
   FaToggleOn,
   FaChair,
+  FaUpload,
 } from "react-icons/fa";
 import Message from "../../components/Message";
 import Loader from "../../components/Loader";
@@ -268,6 +269,33 @@ const AdminEventEditScreen = () => {
   const [imagePreview, setImagePreview] = useState("");
   const [ticketImage, setTicketImage] = useState("");
   const [ticketImagePreview, setTicketImagePreview] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingTicketImage, setUploadingTicketImage] = useState(false);
+  const imageInputRef = useRef(null);
+  const ticketImageInputRef = useRef(null);
+
+  const handleImageUpload = async (file, setUrl, setPreview, setUploading) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('image', file);
+    setUploading(true);
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Greška pri uploadu');
+      setUrl(data.url);
+      setPreview(data.url);
+      toast.success('Slika uspešno uploadovana!');
+    } catch (err) {
+      toast.error(err.message || 'Greška pri uploadu slike');
+    } finally {
+      setUploading(false);
+    }
+  };
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Ostalo");
   const [venueName, setVenueName] = useState("");
@@ -598,16 +626,32 @@ const AdminEventEditScreen = () => {
                   Prikazuje se na listi događaja i stranici detalja.
                 </p>
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">URL slike *</Form.Label>
-                  <Form.Control
-                    value={image}
-                    onChange={(e) => {
-                      setImage(e.target.value);
-                      setImagePreview(e.target.value);
-                    }}
-                    placeholder="https://example.com/slika.jpg"
-                    required
-                  />
+                  <Form.Label className="fw-semibold">Slika događaja *</Form.Label>
+                  <div className="d-flex gap-2">
+                    <Form.Control
+                      value={image}
+                      onChange={(e) => { setImage(e.target.value); setImagePreview(e.target.value); }}
+                      placeholder="https://example.com/slika.jpg ili uploaduj fajl →"
+                    />
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => handleImageUpload(e.target.files[0], setImage, setImagePreview, setUploadingImage)}
+                    />
+                    <Button
+                      variant="outline-success"
+                      style={{ whiteSpace: 'nowrap' }}
+                      disabled={uploadingImage}
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      {uploadingImage
+                        ? <Spinner size="sm" />
+                        : <><FaUpload className="me-1" />Upload</>
+                      }
+                    </Button>
+                  </div>
                 </Form.Group>
                 <ImagePreview
                   src={imagePreview}
@@ -628,20 +672,34 @@ const AdminEventEditScreen = () => {
                   1200×400px.
                 </p>
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold">
-                    URL slike za kartu
-                  </Form.Label>
-                  <Form.Control
-                    value={ticketImage}
-                    onChange={(e) => {
-                      setTicketImage(e.target.value);
-                      setTicketImagePreview(e.target.value);
-                    }}
-                    placeholder="https://example.com/karta-banner.jpg"
-                  />
+                  <Form.Label className="fw-semibold">Slika za kartu</Form.Label>
+                  <div className="d-flex gap-2">
+                    <Form.Control
+                      value={ticketImage}
+                      onChange={(e) => { setTicketImage(e.target.value); setTicketImagePreview(e.target.value); }}
+                      placeholder="https://example.com/karta-banner.jpg ili uploaduj fajl →"
+                    />
+                    <input
+                      ref={ticketImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => handleImageUpload(e.target.files[0], setTicketImage, setTicketImagePreview, setUploadingTicketImage)}
+                    />
+                    <Button
+                      variant="outline-success"
+                      style={{ whiteSpace: 'nowrap' }}
+                      disabled={uploadingTicketImage}
+                      onClick={() => ticketImageInputRef.current?.click()}
+                    >
+                      {uploadingTicketImage
+                        ? <Spinner size="sm" />
+                        : <><FaUpload className="me-1" />Upload</>
+                      }
+                    </Button>
+                  </div>
                   <Form.Text className="text-muted">
-                    Opcionalno — ako nije postavljeno, koristiće se pozadinska
-                    slika
+                    Opcionalno — ako nije postavljeno, koristiće se pozadinska slika
                   </Form.Text>
                 </Form.Group>
                 <ImagePreview

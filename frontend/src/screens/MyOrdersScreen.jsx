@@ -1,17 +1,29 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Card, Col, Row, Accordion, Table, Button, Spinner, Alert } from 'react-bootstrap';
-import { FaTicketAlt, FaCalendarAlt, FaMapMarkerAlt, FaClock, FaDownload, FaCreditCard } from 'react-icons/fa';
+import { FaTicketAlt, FaCalendarAlt, FaMapMarkerAlt, FaClock, FaDownload, FaCreditCard, FaBan } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import { useGetMyOrdersQuery } from '../slices/ordersApiSlice';
+import { useGetMyOrdersQuery, useCancelOrderMutation } from '../slices/ordersApiSlice';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
 import CountdownTimer from '../components/CountdownTimer';
 
 const MyOrdersScreen = () => {
     const navigate = useNavigate();
-    const { data: orders, isLoading, error } = useGetMyOrdersQuery();
+    const { data: orders, isLoading, error, refetch } = useGetMyOrdersQuery();
     const [downloadingKey, setDownloadingKey] = useState(null);
+    const [cancelOrder, { isLoading: loadingCancel }] = useCancelOrderMutation();
+
+    const handleCancelOrder = async (orderId) => {
+        if (!window.confirm('Da li ste sigurni da želite da poništite rezervaciju? Sedišta će biti oslobođena.')) return;
+        try {
+            await cancelOrder(orderId).unwrap();
+            toast.info('Rezervacija je poništena.');
+            refetch();
+        } catch (err) {
+            toast.error(err?.data?.message || 'Greška pri poništavanju');
+        }
+    };
 
     const handleDownloadTicket = async (orderId, itemIndex, qtyIndex, ticketLabel) => {
         const key = `${orderId}-${itemIndex}-${qtyIndex}`;
@@ -113,14 +125,25 @@ const MyOrdersScreen = () => {
                                             Vreme do isteka rezervacije:{' '}
                                             <CountdownTimer expiresAt={order.expiresAt} className="fw-bold font-monospace" />
                                         </div>
-                                        <Button
-                                            variant="success"
-                                            size="sm"
-                                            onClick={() => navigate(`/orders/${order._id}`)}
-                                        >
-                                            <FaCreditCard className="me-2" />
-                                            Plati sada
-                                        </Button>
+                                        <div className="d-flex gap-2 flex-shrink-0">
+                                            <Button
+                                                variant="success"
+                                                size="sm"
+                                                onClick={() => navigate(`/orders/${order._id}`)}
+                                            >
+                                                <FaCreditCard className="me-2" />
+                                                Plati sada
+                                            </Button>
+                                            <Button
+                                                variant="outline-danger"
+                                                size="sm"
+                                                disabled={loadingCancel}
+                                                onClick={() => handleCancelOrder(order._id)}
+                                            >
+                                                <FaBan className="me-1" />
+                                                Poništi
+                                            </Button>
+                                        </div>
                                     </Alert>
                                 )}
 

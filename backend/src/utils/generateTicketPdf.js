@@ -143,15 +143,24 @@ export const generateTicketPdf = async ({ order, orderItem, event, ticketIndex }
       drawInfo('CENA', `${orderItem.price?.toLocaleString('sr-RS') || 0} RSD`, midX, cardY + 52, midW);
       drawInfo('KUPAC', order.user?.name || 'Gost', midX, cardY + 90, midW);
 
-      // Sedište
+      // Sedište — za GA/standing zone (row počinje sa "GA-") prikaži samo naziv
+      // zone, bez tehničkog reda i broja koji su interni i ne znače ništa kupcu.
       if (orderItem.seats && orderItem.seats.length > 0) {
         const seat = orderItem.seats[0];
-        const parts = [];
-        if (seat.sector) parts.push(`Sekcija: ${seat.sector}`);
-        if (seat.row) parts.push(`Red: ${seat.row}`);
-        if (seat.seatNumber) parts.push(`Br: ${seat.seatNumber}`);
-        if (parts.length > 0) {
-          drawInfo('SEDIŠTE', parts.join('   '), midX, cardY + 128, midW);
+        const isStandingZone = seat.row?.startsWith('GA-');
+
+        if (isStandingZone) {
+          if (seat.sector) {
+            drawInfo('ZONA', seat.sector, midX, cardY + 128, midW);
+          }
+        } else {
+          const parts = [];
+          if (seat.sector) parts.push(`Sekcija: ${seat.sector}`);
+          if (seat.row) parts.push(`Red: ${seat.row}`);
+          if (seat.seatNumber) parts.push(`Br: ${seat.seatNumber}`);
+          if (parts.length > 0) {
+            drawInfo('SEDIŠTE', parts.join('   '), midX, cardY + 128, midW);
+          }
         }
       }
 

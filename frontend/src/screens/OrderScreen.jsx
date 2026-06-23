@@ -55,7 +55,7 @@ const OrderScreen = () => {
             try {
                 await payOrder({ orderId, details }).unwrap();
                 refetch();
-                toast.success('Plaćanje uspešno! Karte su Vam poslate na mejl.');
+                toast.success('Plaćanje uspešno! Karte su rezervisane. 🎉');
             } catch (err) {
                 toast.error(err?.data?.message || 'Greška pri obradi plaćanja');
             }
@@ -78,10 +78,10 @@ const OrderScreen = () => {
             {/* ── Header ── */}
             {order.isPaid ? (
                 <div className="text-center mb-5">
-                    {/* <div style={{ fontSize: 64, marginBottom: 12 }}></div> */}
+                    <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
                     <h2 className="fw-bold text-success">Plaćanje uspešno!</h2>
                     <p className="text-muted">
-                        Hvala na kupovini! Vaše karte su Vam poslate na mejl.
+                        Hvala na kupovini! Vaše karte su rezervisane.
                     </p>
                     <Button variant="outline-success" onClick={() => navigate('/myorders')}>
                         <FaTicketAlt className="me-2" />
@@ -101,7 +101,7 @@ const OrderScreen = () => {
                     <Alert variant="warning" className="d-inline-flex align-items-center gap-2 mt-2 py-2 px-3 mb-0">
                         <FaClock />
                         <span>
-                            Karte su rezervisane još:{' '}
+                            Sedišta su rezervisana još:{' '}
                             <CountdownTimer expiresAt={order.expiresAt} className="fw-bold font-monospace" />
                         </span>
                     </Alert>
@@ -144,15 +144,25 @@ const OrderScreen = () => {
                                                 </Badge>
                                                 <span className="text-muted small">× {item.quantity}</span>
                                             </div>
-                                            {/* Sedišta */}
+                                            {/* Sedišta — za GA/standing zone prikaži samo naziv zone */}
                                             {item.seats?.length > 0 && (
-                                                <div className="mt-2 d-flex flex-wrap gap-1">
-                                                    {item.seats.map((s, j) => (
-                                                        <Badge key={j} bg="light" text="dark" className="border font-monospace" style={{ fontSize: 10 }}>
-                                                            {s.sector ? `${s.sector} ` : ''}{s.row}{s.seatNumber}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
+                                                item.seats[0]?.row?.startsWith('GA-') ? (
+                                                    item.seats[0]?.sector && (
+                                                        <div className="mt-2">
+                                                            <Badge bg="light" text="dark" className="border">
+                                                                Zona: {item.seats[0].sector}
+                                                            </Badge>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div className="mt-2 d-flex flex-wrap gap-1">
+                                                        {item.seats.map((s, j) => (
+                                                            <Badge key={j} bg="light" text="dark" className="border font-monospace" style={{ fontSize: 10 }}>
+                                                                {s.sector ? `${s.sector} ` : ''}{s.row}{s.seatNumber}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                )
                                             )}
                                         </div>
                                         <div className="text-end flex-shrink-0">

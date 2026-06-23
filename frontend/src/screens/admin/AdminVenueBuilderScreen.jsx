@@ -50,17 +50,25 @@ const makeSection = (x, y, ticketType) => ({
     price:          ticketType?.price || 0,
 });
 
-const makeDecoration = (type, x, y) => ({
-    _localId: uid(),
-    type,
-    x: snap(x), y: snap(y),
-    width:  type === 'stage' ? 300 : 80,
-    height: type === 'stage' ? 60  : 40,
-    label:  type === 'stage' ? 'BINA' : type === 'entrance' ? 'ULAZ' : 'Tekst',
-    color:  type === 'stage' ? '#1f2937' : type === 'entrance' ? '#065f46' : '#374151',
-    angle: 0,
-    fontSize: type === 'stage' ? 18 : 13,
-});
+const makeDecoration = (type, x, y) => {
+    const width  = type === 'stage' ? 460 : 80;
+    const height = type === 'stage' ? 70  : 40;
+
+    return {
+        _localId: uid(),
+        type,
+        // Bina/teren se uvek kreira horizontalno centrirana na canvas-u
+        // (admin je posle slobodno može prevući bilo gde — levo/desno/dole...)
+        x: type === 'stage' ? snap((CW - width) / 2) : snap(x),
+        y: snap(y),
+        width,
+        height,
+        label:  type === 'stage' ? 'BINA' : type === 'entrance' ? 'ULAZ' : 'Tekst',
+        color:  type === 'stage' ? '#1f2937' : type === 'entrance' ? '#065f46' : '#374151',
+        angle: 0,
+        fontSize: type === 'stage' ? 18 : 13,
+    };
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminVenueBuilderScreen() {
@@ -235,11 +243,29 @@ export default function AdminVenueBuilderScreen() {
         mouseDownOnObject.current = true;
         const items = isSection ? sections : decorations;
         const obj   = items.find(o => o._localId === id);
+        const angle = obj.angle || 0;
+        const rad   = (angle * Math.PI) / 180;
+        const cos   = Math.cos(rad), sin = Math.sin(rad);
+
+        // Ugao suprotan onom koji se vuče (anchor) — lokalni ofset od centra
+        const anchorLocal = {
+            x: (edge.includes('w') ? 1 : -1) * obj.width  / 2,
+            y: (edge.includes('n') ? 1 : -1) * obj.height / 2,
+        };
+        const origCenter = { x: obj.x + obj.width / 2, y: obj.y + obj.height / 2 };
+
+        // Pretvori anchor u EKRANSKU (rotiranu) poziciju — ona mora ostati
+        // fiksna tokom celog resize-a, bez obzira na ugao rotacije.
+        const anchorScreen = {
+            x: origCenter.x + (anchorLocal.x * cos - anchorLocal.y * sin),
+            y: origCenter.y + (anchorLocal.x * sin + anchorLocal.y * cos),
+        };
+
         resizing.current = {
-            id, isSection, edge,
+            id, isSection, edge, angle,
             startX: e.clientX, startY: e.clientY,
-            origX: obj.x, origY: obj.y,
             origW: obj.width, origH: obj.height,
+            anchorScreen,
         };
     };
 
@@ -260,17 +286,47 @@ export default function AdminVenueBuilderScreen() {
             if (isSection) setSections(upd); else setDecorations(upd);
         }
         if (resizing.current) {
-            const { id, isSection, edge, startX, startY, origX, origY, origW, origH } = resizing.current;
+            const { id, isSection, edge, angle, startX, startY, origW, origH, anchorScreen } = resizing.current;
             const dx = (e.clientX - startX) / zoom;
             const dy = (e.clientY - startY) / zoom;
+
+            const rad = (angle * Math.PI) / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+
+            // Pomeraj miša u lokalni (nerotirani) koordinatni sistem objekta —
+            // da bi ivice za resize reagovale u pravom smeru bez obzira na ugao.
+            const ldx = dx * cos + dy * sin;
+            const ldy = -dx * sin + dy * cos;
+
             const upd = arr => arr.map(o => {
                 if (o._localId !== id) return o;
-                let { x, y, width, height } = o;
-                if (edge.includes('e')) width  = Math.max(GRID * 3, snap(origW + dx));
-                if (edge.includes('s')) height = Math.max(GRID * 2, snap(origH + dy));
-                if (edge.includes('w')) { width  = Math.max(GRID * 3, snap(origW - dx)); x = snap(origX + dx); }
-                if (edge.includes('n')) { height = Math.max(GRID * 2, snap(origH - dy)); y = snap(origY + dy); }
-                return { ...o, x, y, width, height };
+
+                let newW = origW, newH = origH;
+                if (edge.includes('e')) newW = Math.max(GRID * 3, snap(origW + ldx));
+                if (edge.includes('w')) newW = Math.max(GRID * 3, snap(origW - ldx));
+                if (edge.includes('s')) newH = Math.max(GRID * 2, snap(origH + ldy));
+                if (edge.includes('n')) newH = Math.max(GRID * 2, snap(origH - ldy));
+
+                // Anchor (suprotni ugao) MORA ostati na istoj tački na ekranu —
+                // iz toga izvodimo novi centar, pa x/y. Time se sekcija nikad
+                // ne "pomera" sama od sebe dok menjaš veličinu, bez obzira na
+                // ugao rotacije ili na to da li je veličina udarila u minimum.
+                const anchorLocalNew = {
+                    x: (edge.includes('w') ? 1 : -1) * newW / 2,
+                    y: (edge.includes('n') ? 1 : -1) * newH / 2,
+                };
+                const anchorRotatedNew = {
+                    x: anchorLocalNew.x * cos - anchorLocalNew.y * sin,
+                    y: anchorLocalNew.x * sin + anchorLocalNew.y * cos,
+                };
+                const newCenter = {
+                    x: anchorScreen.x - anchorRotatedNew.x,
+                    y: anchorScreen.y - anchorRotatedNew.y,
+                };
+                const x = snap(newCenter.x - newW / 2);
+                const y = snap(newCenter.y - newH / 2);
+
+                return { ...o, x, y, width: newW, height: newH };
             });
             if (isSection) setSections(upd); else setDecorations(upd);
         }
@@ -811,6 +867,8 @@ function SectionObject({ section: s, selected, tool, onMouseDown, onResizeMouseD
                     ? `0 0 0 3px ${s.color}66, 0 4px 20px rgba(0,0,0,0.18)`
                     : '0 2px 6px rgba(0,0,0,0.08)',
                 transition: 'box-shadow 0.12s',
+                transform: `rotate(${s.angle || 0}deg)`,
+                transformOrigin: 'center center',
             }}
         >
             {/* Dot-matrix seat preview */}
@@ -958,6 +1016,34 @@ function SectionConfigPanel({ section: s, event, update, onDelete, onDuplicate }
             <div className="mb-2">
                 {label('Naziv sekcije')}
                 <Form.Control size="sm" value={s.name} onChange={e => update('name', e.target.value)} />
+            </div>
+
+            {/* Rotacija */}
+            <div className="mb-2">
+                {label('Rotacija')}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    {[0, 90, 180, 270].map(deg => (
+                        <button key={deg} onClick={() => update('angle', deg)}
+                            style={{
+                                flex: 1, padding: '6px 4px', borderRadius: 6, cursor: 'pointer',
+                                border: `2px solid ${(s.angle || 0) === deg ? '#3b82f6' : '#e2e8f0'}`,
+                                background: (s.angle || 0) === deg ? '#eff6ff' : '#fafafa',
+                                color: (s.angle || 0) === deg ? '#1d4ed8' : '#374151',
+                                fontWeight: 600, fontSize: 12,
+                            }}
+                        >
+                            {deg}°
+                        </button>
+                    ))}
+                </div>
+                <Form.Range
+                    min={0} max={359} step={1}
+                    value={s.angle || 0}
+                    onChange={e => update('angle', Number(e.target.value))}
+                />
+                <div style={{ textAlign: 'center', fontSize: 11, color: '#64748b', marginTop: -4 }}>
+                    {s.angle || 0}°
+                </div>
             </div>
 
             {/* Tip sekcije */}

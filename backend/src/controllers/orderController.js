@@ -1,7 +1,7 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import Order from "../models/orderModel.js";
 import Event from "../models/eventModel.js";
-import { reserveSeats } from "./seatController.js";
+import { reserveSeats, releaseSeats } from "./seatController.js";
 import { sendTicketEmail } from "../utils/sendTicketEmail.js";
 import { generateTicketPdf } from "../utils/generateTicketPdf.js";
 
@@ -136,7 +136,7 @@ const updateOrderToPaid = asyncHandler(async (req, res) => {
   try {
     const eventId = order.orderItems[0].eventId;
     console.log('[EMAIL] EventId:', eventId);
-    const event = await Event.findById(eventId).populate("venue");
+    const event = await Event.findById(eventId);
     console.log('[EMAIL] Event pronađen:', event ? event.name : 'NULL');
     if (event) {
       await sendTicketEmail({ order, event });
@@ -178,7 +178,7 @@ const confirmFreeOrder = asyncHandler(async (req, res) => {
   try {
     const eventId = order.orderItems[0].eventId;
     console.log('[EMAIL] EventId:', eventId);
-    const event = await Event.findById(eventId).populate("venue");
+    const event = await Event.findById(eventId);
     console.log('[EMAIL] Event pronađen:', event ? event.name : 'NULL');
     if (event) {
       await sendTicketEmail({ order, event });
@@ -270,6 +270,47 @@ const getOrders = asyncHandler(async (req, res) => {
   res.status(200).json(orders);
 });
 
+// @desc    Otkaži neplaćenu narudžbinu i oslobodi rezervisana sedišta
+// @route   DELETE /api/orders/:id
+// @access  Private (vlasnik narudžbine)
+const cancelOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) {
+    res.status(404);
+    throw new Error("Narudžbina nije pronađena");
+  }
+
+  if (order.user.toString() !== req.user._id.toString()) {
+    res.status(401);
+    throw new Error("Nije autorizovano");
+  }
+
+  if (order.isPaid) {
+    res.status(400);
+    throw new Error("Plaćena narudžbina se ne može otkazati");
+  }
+
+  // Oslobodi rezervisana sedišta
+  await releaseSeats(order._id);
+
+  // Vrati availableQuantity na eventu
+  for (const item of order.orderItems) {
+    const event = await Event.findById(item.eventId);
+    if (event) {
+      const ticketType = event.ticketTypes.id(item.ticketTypeId);
+      if (ticketType) {
+        ticketType.availableQuantity += item.quantity;
+        await event.save();
+      }
+    }
+  }
+
+  await Order.findByIdAndDelete(order._id);
+
+  res.status(200).json({ message: "Narudžbina otkazana" });
+});
+
 export {
   createOrder,
   getOrderById,
@@ -278,4 +319,5 @@ export {
   getMyOrders,
   getOrders,
   getOrderTicketPdf,
+  cancelOrder,
 };

@@ -1,6 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Row, Col, Card, Button, Badge, Image, Spinner, Alert } from 'react-bootstrap';
+import { Row, Col, Card, Button, Badge, Spinner, Alert } from 'react-bootstrap';
 import { FaArrowLeft, FaCreditCard, FaCalendarAlt, FaMapMarkerAlt, FaTicketAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import CheckoutSteps from '../components/CheckoutSteps';
@@ -54,13 +54,6 @@ const PlaceOrderScreen = () => {
                         <Card key={idx} className="mb-3 border-0 shadow-sm">
                             <Card.Body className="p-3">
                                 <div className="d-flex gap-3 align-items-start">
-                                    <Image
-                                        src={item.eventImage}
-                                        alt={item.eventName}
-                                        rounded
-                                        style={{ width: 90, height: 65, objectFit: 'cover', flexShrink: 0 }}
-                                        onError={e => (e.target.src = 'https://placehold.co/90x65/e9ecef/6c757d?text=Event')}
-                                    />
                                     <div className="flex-grow-1">
                                         <div className="fw-bold fs-6">{item.eventName}</div>
                                         <div className="text-muted small d-flex flex-wrap gap-3 mt-1">

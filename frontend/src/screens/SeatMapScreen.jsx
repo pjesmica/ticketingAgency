@@ -183,6 +183,7 @@ export default function SeatMapScreen() {
                             seats={seatsBySection[focusedSectionId] || []}
                             selectedSeatIds={selectedSeatIds}
                             onToggle={toggleSeat}
+                            stage={decorations.find(d => d.type === 'stage')}
                         />
                     )}
                 </div>
@@ -302,6 +303,7 @@ function VenueOverviewMap({ sections, decorations, seatsBySection, selectedSeatI
 
                     return (
                         <g key={id} style={{ cursor: sec.sectorType === 'standing' ? 'default' : 'pointer' }}
+                            transform={sec.angle ? `rotate(${sec.angle}, ${sec.x + sec.width / 2}, ${sec.y + sec.height / 2})` : undefined}
                             onClick={() => onSectionClick(sec)}
                             onMouseEnter={() => setHovered(id)}
                             onMouseLeave={() => setHovered(null)}
@@ -327,7 +329,7 @@ function VenueOverviewMap({ sections, decorations, seatsBySection, selectedSeatI
                             <text x={sec.x + sec.width / 2} y={sec.y + sec.height / 2 + 4}
                                 textAnchor="middle" fill={sec.color}
                                 fontSize={Math.min(12, sec.width / 14)} fontWeight="700">
-                                {sec.sectorType === 'standing' ? 'GA zona' : `${sec.rowCount}r × ${sec.seatsPerRow}m`}
+                                {sec.sectorType === 'standing' ? 'Stajanje' : `${sec.rowCount}r × ${sec.seatsPerRow}m`}
                             </text>
                             <text x={sec.x + sec.width / 2} y={sec.y + sec.height / 2 + 18}
                                 textAnchor="middle" fill="#475569" fontSize={Math.min(11, sec.width / 16)}>
@@ -354,7 +356,7 @@ function VenueOverviewMap({ sections, decorations, seatsBySection, selectedSeatI
             {/* GA cards */}
             {sections.filter(s => s.sectorType === 'standing').length > 0 && (
                 <div style={{ marginTop: 24 }}>
-                    <p style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 8 }}>GA / Standing zone</p>
+                    <p style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 8 }}>Zone za stajanje</p>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         {sections.filter(s => s.sectorType === 'standing').map(sec => {
                             const id   = sec._id || sec._localId;
@@ -408,10 +410,34 @@ function GACard({ section: s, available, qty, onChange }) {
     );
 }
 
+// ─── Helper: na kojoj se strani nalazi bina u odnosu na sekciju ─────────────
+// Vraća 'top' | 'bottom' | 'left' | 'right' — koristi se da prikaz unutar
+// sekcije (SectionSeatPicker) bude orijentisan isto kao na glavnoj mapi sale,
+// da korisnika ne zbuni kad uđe u sekciju da bira sedišta.
+const getStageSide = (section, stage) => {
+    if (!section || !stage) return 'top';
+
+    const sectionCenterX = section.x + section.width / 2;
+    const sectionCenterY = section.y + section.height / 2;
+    const stageCenterX   = stage.x + (stage.width || 0) / 2;
+    const stageCenterY   = stage.y + (stage.height || 0) / 2;
+
+    const dx = stageCenterX - sectionCenterX;
+    const dy = stageCenterY - sectionCenterY;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        return dx > 0 ? 'right' : 'left';
+    }
+    return dy > 0 ? 'bottom' : 'top';
+};
+
 // ─── Section seat picker ──────────────────────────────────────────────────────
-function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle }) {
-    const [filter, setFilter] = useState('all');
+function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle, stage }) {
     if (!section) return null;
+
+    const stageSide    = getStageSide(section, stage);
+    const isHorizontal = stageSide === 'left' || stageSide === 'right';
+    const stageLabel   = (stage?.label?.trim()) || 'BINA';
 
     const byRow = seats.reduce((acc, seat) => {
         if (!acc[seat.row]) acc[seat.row] = [];
@@ -419,16 +445,15 @@ function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle }) {
         return acc;
     }, {});
 
-    const rows = Object.keys(byRow).sort();
+    let rows = Object.keys(byRow).sort();
 
-    const filtered = rows.map(row => ({
-        row,
-        seats: byRow[row].filter(s => {
-            if (filter === 'free')     return !s.isReserved;
-            if (filter === 'selected') return selectedSeatIds.has(s._id);
-            return true;
-        }),
-    })).filter(r => r.seats.length > 0);
+    // Red sa najmanjom oznakom (npr. "A") je po konvenciji najbliži bini —
+    // poređaj redove tako da taj red uvek bude vizuelno najbliži BINA oznaci.
+    if (stageSide === 'bottom' || stageSide === 'right') {
+        rows = [...rows].reverse();
+    }
+
+    const filtered = rows.map(row => ({ row, seats: byRow[row] }));
 
     const selectedInSection = seats.filter(s => selectedSeatIds.has(s._id)).length;
 
@@ -440,25 +465,6 @@ function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle }) {
                 {selectedInSection > 0 && (
                     <Badge bg="success">{selectedInSection} izabrano</Badge>
                 )}
-
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                    {[
-                        { v: 'all', l: 'Sva' },
-                        { v: 'free', l: 'Slobodna' },
-                        { v: 'selected', l: 'Izabrana' },
-                    ].map(f => (
-                        <button key={f.v} onClick={() => setFilter(f.v)}
-                            style={{
-                                padding: '4px 10px', borderRadius: 5, border: 'none',
-                                cursor: 'pointer', fontSize: 12,
-                                background: filter === f.v ? '#1e293b' : '#e2e8f0',
-                                color:      filter === f.v ? '#fff'    : '#374151',
-                                fontWeight: filter === f.v ? 700 : 400,
-                            }}>
-                            {f.l}
-                        </button>
-                    ))}
-                </div>
             </div>
 
             {/* Legend */}
@@ -476,59 +482,113 @@ function SectionSeatPicker({ section, seats, selectedSeatIds, onToggle }) {
                 ))}
             </div>
 
-            <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflowX: 'auto' }}>
-                <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <div style={{ display: 'inline-block', padding: '4px 24px', background: '#1e293b', color: '#fff', borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: 2 }}>
-                        ▼ BINA
-                    </div>
-                </div>
+            <div style={{ background: '#fff', borderRadius: 10, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'auto' }}>
+                {!isHorizontal ? (
+                    /* Bina je gore ili dole — redovi naslagani vertikalno (kao i do sada) */
+                    <>
+                        {stageSide === 'top' && (
+                            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                                <div style={{ display: 'inline-block', padding: '14px 48px', background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: 16, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                                    ▼ {stageLabel}
+                                </div>
+                            </div>
+                        )}
 
-                {filtered.map(({ row, seats: rowSeats }) => (
-                    <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                        <div style={{ width: 28, textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
-                            {row}
+                        {filtered.map(({ row, seats: rowSeats }) => (
+                            <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                                <div style={{ width: 28, textAlign: 'right', fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                                    {row}
+                                </div>
+                                <div style={{ display: 'flex', gap: 3 }}>
+                                    {rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => (
+                                        <SeatButton key={seat._id} seat={seat} row={row} section={section}
+                                            isSelected={selectedSeatIds.has(seat._id)} onToggle={onToggle} />
+                                    ))}
+                                </div>
+                                <div style={{ width: 28, fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
+                                    {row}
+                                </div>
+                            </div>
+                        ))}
+
+                        {stageSide === 'bottom' && (
+                            <div style={{ textAlign: 'center', marginTop: 20 }}>
+                                <div style={{ display: 'inline-block', padding: '14px 48px', background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: 16, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                                    ▲ {stageLabel}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    /* Bina je levo ili desno — redovi naslagani kao kolone (transponovano) */
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        {stageSide === 'left' && (
+                            <div style={{ writingMode: 'vertical-rl', flexShrink: 0 }}>
+                                <div style={{ display: 'inline-block', padding: '48px 14px', background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: 16, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                                    {stageLabel}
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            {filtered.map(({ row, seats: rowSeats }) => (
+                                <div key={row} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b' }}>{row}</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                        {rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => (
+                                            <SeatButton key={seat._id} seat={seat} row={row} section={section}
+                                                isSelected={selectedSeatIds.has(seat._id)} onToggle={onToggle} />
+                                        ))}
+                                    </div>
+                                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b' }}>{row}</div>
+                                </div>
+                            ))}
                         </div>
-                        <div style={{ display: 'flex', gap: 3 }}>
-                            {rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => {
-                                const isSel     = selectedSeatIds.has(seat._id);
-                                const isRes     = seat.isReserved && !seat.isBlocked;
-                                const isBlocked = seat.isBlocked;
-                                return (
-                                    <button key={seat._id}
-                                        onClick={() => !isBlocked && onToggle(seat)}
-                                        disabled={isRes || isBlocked}
-                                        title={isBlocked ? `Blokirano mesto` : `${row}${seat.seatNumber} · ${seat.price} RSD`}
-                                        style={{
-                                            width: 20, height: 20, borderRadius: 3, padding: 0,
-                                            background: isBlocked ? '#1e293b' : isRes ? '#e2e8f0' : isSel ? '#22c55e' : section.color,
-                                            border: isSel ? '2px solid #fff' : '1px solid rgba(0,0,0,0.1)',
-                                            boxShadow: isSel ? `0 0 0 2px #22c55e` : 'none',
-                                            cursor: isBlocked ? 'not-allowed' : isRes ? 'not-allowed' : 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: 7, color: isBlocked ? '#475569' : isRes ? '#9ca3af' : '#fff',
-                                            fontWeight: 700, flexShrink: 0,
-                                            opacity: isBlocked ? 0.5 : isRes ? 0.5 : 1,
-                                        }}
-                                        onMouseEnter={e => { if (!isRes && !isBlocked) e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                                    >
-                                        {!isBlocked && seat.seatNumber}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div style={{ width: 28, fontSize: 10, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>
-                            {row}
-                        </div>
+
+                        {stageSide === 'right' && (
+                            <div style={{ writingMode: 'vertical-rl', flexShrink: 0 }}>
+                                <div style={{ display: 'inline-block', padding: '48px 14px', background: '#1e293b', color: '#fff', borderRadius: 8, fontSize: 16, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                                    {stageLabel}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ))}
+                )}
 
                 {filtered.length === 0 && (
                     <p style={{ textAlign: 'center', color: '#9ca3af', padding: '24px 0', fontSize: 13 }}>
-                        Nema sedišta za ovaj filter
+                        Nema sedišta u ovoj sekciji
                     </p>
                 )}
             </div>
         </div>
+    );
+}
+
+// ─── Pojedinačno dugme sedišta (deljeno između vertikalnog i transponovanog prikaza) ──
+function SeatButton({ seat, row, section, isSelected, onToggle }) {
+    const isRes     = seat.isReserved && !seat.isBlocked;
+    const isBlocked = seat.isBlocked;
+    return (
+        <button
+            onClick={() => !isBlocked && onToggle(seat)}
+            disabled={isRes || isBlocked}
+            title={isBlocked ? `Blokirano mesto` : `${row}${seat.seatNumber} · ${seat.price} RSD`}
+            style={{
+                width: 20, height: 20, borderRadius: 3, padding: 0,
+                background: isBlocked ? '#1e293b' : isRes ? '#e2e8f0' : isSelected ? '#22c55e' : section.color,
+                border: isSelected ? '2px solid #fff' : '1px solid rgba(0,0,0,0.1)',
+                boxShadow: isSelected ? `0 0 0 2px #22c55e` : 'none',
+                cursor: isBlocked ? 'not-allowed' : isRes ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 7, color: isBlocked ? '#475569' : isRes ? '#9ca3af' : '#fff',
+                fontWeight: 700, flexShrink: 0,
+                opacity: isBlocked ? 0.5 : isRes ? 0.5 : 1,
+            }}
+            onMouseEnter={e => { if (!isRes && !isBlocked) e.currentTarget.style.transform = 'scale(1.2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+            {!isBlocked && seat.seatNumber}
+        </button>
     );
 }
